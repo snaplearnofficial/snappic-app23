@@ -44,7 +44,17 @@ if (!MONGO_URI || MONGO_URI.includes('your_mongodb')) {
 }
 
 mongoose.connect(MONGO_URI || 'mongodb://127.0.0.1:27017/snappic')
-  .then(() => console.log('✅ Connected to MongoDB Atlas!'))
+  .then(async () => {
+    console.log('✅ Connected to MongoDB Atlas!');
+    // Connection Ping Test
+    try {
+      const admin = mongoose.connection.db.admin();
+      await admin.command({ ping: 1 });
+      console.log('📡 Database Ping Successful: Connection is healthy!');
+    } catch (e) {
+      console.log('⚠️ Connected but Ping failed. Check permissions.');
+    }
+  })
   .catch(err => {
     console.error('❌ MongoDB Connection Error. Make sure your IP is whitelisted on MongoDB Atlas.');
     console.error(err.message);
