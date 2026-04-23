@@ -1,369 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Snappic – Share Your World</title>
-<meta name="description" content="Snappic is a premium real-time social platform. Share photos, follow friends, and chat instantly.">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<style>
-:root{--bg:#fafafa;--surface:#fff;--border:#dbdbdb;--text:#262626;--muted:#8e8e8e;--primary:#0095f6;--danger:#ed4956;--grad:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);--glass:rgba(255,255,255,.9);--shadow:0 2px 12px rgba(0,0,0,.08)}
-[data-theme=dark]{--bg:#000;--surface:#1c1c1c;--border:#262626;--text:#fafafa;--muted:#a8a8a8;--glass:rgba(0,0,0,.9)}
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Plus Jakarta Sans',sans-serif;-webkit-tap-highlight-color:transparent}
-body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s}
-.hidden{display:none!important}
-a{text-decoration:none;color:inherit}
-input,textarea,button{font-family:inherit;outline:none}
-button{cursor:pointer;transition:all .2s}
-img{display:block}
-
-/* Scrollbar */
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-
-/* Auth */
-.auth-wrap{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:var(--bg)}
-.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:44px 40px;width:100%;max-width:350px;text-align:center}
-.auth-logo{font-size:30px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:28px;display:block}
-.auth-err{color:var(--danger);font-size:13px;margin-bottom:12px;min-height:16px}
-.auth-inp{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;margin-bottom:10px}
-.auth-inp:focus{border-color:var(--primary)}
-.auth-btn{width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:15px;margin-top:6px;letter-spacing:.3px}
-.auth-btn:hover{filter:brightness(1.08)}
-.auth-switch{font-size:14px;color:var(--muted);margin-top:20px;border-top:1px solid var(--border);padding-top:20px}
-.auth-switch span{color:var(--primary);font-weight:700;cursor:pointer}
-.auth-switch span:hover{text-decoration:underline}
-
-/* App shell */
-.app-wrap{display:none}
-
-/* Navbar */
-.nav{position:fixed;top:0;left:0;right:0;height:60px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:900;display:flex;align-items:center;justify-content:center}
-.nav-inner{width:100%;max-width:975px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.nav-logo{font-size:24px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.nav-search-wrap{position:relative;flex:1;max-width:280px}
-.nav-search{width:100%;padding:9px 14px 9px 38px;border:1px solid var(--border);border-radius:10px;background:#efefef;color:var(--text);font-size:14px}
-[data-theme=dark] .nav-search{background:#262626}
-.nav-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:18px}
-.search-drop{position:absolute;top:calc(100%+8px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);z-index:200;display:none;overflow:hidden;max-height:300px;overflow-y:auto}
-.search-item{padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .15s}
-.search-item:hover{background:var(--bg)}
-.nav-icons{display:flex;align-items:center;gap:6px}
-.nav-btn{width:42px;height:42px;border-radius:12px;background:none;border:none;color:var(--text);font-size:24px;display:flex;align-items:center;justify-content:center;position:relative;transition:.2s}
-.nav-btn:hover{background:var(--border)}
-.notif-dot{position:absolute;top:7px;right:7px;width:8px;height:8px;background:var(--danger);border-radius:50%;border:2px solid var(--surface);display:none}
-
-/* Main Layout */
-.main{max-width:975px;margin:80px auto 0;padding:0 20px;display:grid;grid-template-columns:1fr 293px;gap:28px}
-@media(max-width:935px){.main{grid-template-columns:1fr}.sidebar{display:none}}
-
-/* Stories */
-.stories-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 8px;margin-bottom:24px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
-.stories-bar::-webkit-scrollbar{display:none}
-.story-item{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:72px;cursor:pointer;padding:0 6px}
-.story-ring{width:64px;height:64px;border-radius:50%;padding:2px;background:var(--grad);flex-shrink:0;transition:transform .2s}
-.story-ring:hover{transform:scale(1.05)}
-.story-ring.seen{background:var(--border)}
-.story-av{width:100%;height:100%;border-radius:50%;border:2px solid var(--surface);background:#eee;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#555;overflow:hidden}
-.story-name{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px;text-align:center}
-
-/* Post Creator */
-.post-creator{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:24px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.2s}
-.post-creator:hover{background:var(--bg)}
-.creator-text{flex:1;padding:9px 18px;background:#efefef;border-radius:8px;font-size:14px;color:var(--muted)}
-[data-theme=dark] .creator-text{background:#262626}
-
-/* Post */
-.post{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:24px;overflow:hidden}
-.post-header{padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
-.post-user{display:flex;align-items:center;gap:10px;cursor:pointer}
-.av{width:32px;height:32px;border-radius:50%;background:#eee;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;overflow:hidden}
-.av.lg{width:44px;height:44px;font-size:16px}
-.av.xl{width:86px;height:86px;font-size:34px}
-.username{font-size:14px;font-weight:700}
-.post-more{font-size:22px;cursor:pointer;color:var(--muted)}
-.post-img{width:100%;max-height:700px;object-fit:contain;background:#000;display:block}
-.post-actions{padding:10px 16px;display:flex;align-items:center;gap:16px}
-.action-btn{font-size:26px;cursor:pointer;transition:transform .15s;color:var(--text)}
-.action-btn:hover{transform:scale(1.1)}
-.action-btn.liked{color:var(--danger)}
-.bookmarks{margin-left:auto}
-.post-likes{padding:0 16px 6px;font-size:14px;font-weight:700}
-.post-cap{padding:0 16px 10px;font-size:14px;line-height:1.5}
-.post-cap span{font-weight:700;margin-right:5px;cursor:pointer}
-.post-view-cmts{padding:0 16px 10px;font-size:14px;color:var(--muted);cursor:pointer}
-.post-time{padding:0 16px 10px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-.post-cmt-bar{border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px}
-.post-cmt-bar input{flex:1;border:none;background:transparent;color:var(--text);font-size:14px}
-.post-cmt-bar input::placeholder{color:var(--muted)}
-.post-btn{background:none;border:none;color:var(--primary);font-weight:700;font-size:14px;opacity:.4}
-.post-btn.active{opacity:1}
-
-/* Feed Empty */
-.feed-empty{text-align:center;padding:60px 20px;color:var(--muted)}
-.feed-empty i{font-size:60px;margin-bottom:16px;display:block}
-.feed-spinner{text-align:center;padding:40px;color:var(--muted)}
-.feed-spinner i{font-size:36px;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Sidebar */
-.sidebar{position:sticky;top:80px;height:fit-content}
-.side-profile{display:flex;align-items:center;gap:14px;margin-bottom:24px}
-.side-info{flex:1}
-.side-un{font-size:14px;font-weight:700}
-.side-name{font-size:14px;color:var(--muted)}
-.side-switch{font-size:13px;color:var(--primary);font-weight:700;cursor:pointer}
-.side-switch:hover{color:#00376b}
-.side-suggest-title{display:flex;justify-content:space-between;margin-bottom:16px}
-.side-suggest-title span{font-size:13px;font-weight:700;color:var(--muted)}
-.suggest-item{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.suggest-info{flex:1}
-.suggest-un{font-size:13px;font-weight:700}
-.suggest-sub{font-size:13px;color:var(--muted)}
-.follow-sm{font-size:13px;color:var(--primary);font-weight:700;cursor:pointer;background:none;border:none}
-.side-footer{font-size:11px;color:var(--muted);margin-top:24px;line-height:1.8}
-
-/* Modals */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
-.modal.show{opacity:1;pointer-events:auto}
-.modal-box{background:var(--surface);border-radius:16px;width:100%;overflow:hidden;position:relative;transform:scale(.96);transition:transform .2s;max-height:90vh;overflow-y:auto}
-.modal.show .modal-box{transform:scale(1)}
-.modal-hd{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
-.modal-title{font-weight:800;font-size:15px}
-.modal-close{font-size:28px;cursor:pointer;color:var(--muted);background:none;border:none;display:flex;align-items:center}
-.modal-close:hover{color:var(--text)}
-.modal-body{padding:20px}
-
-/* Create Post */
-.file-pick{display:block;padding:18px;background:#efefef;border-radius:12px;text-align:center;cursor:pointer;font-weight:700;font-size:14px;color:var(--text);transition:.2s}
-[data-theme=dark] .file-pick{background:#262626}
-.file-pick:hover{background:var(--border)}
-#create-preview{width:100%;border-radius:12px;max-height:350px;object-fit:contain;margin-bottom:16px;display:none}
-.modal-textarea{width:100%;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:14px;resize:none;height:110px;margin-top:14px}
-.modal-textarea:focus{border-color:var(--primary)}
-.modal-btn{width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:12px;font-weight:700;font-size:15px;margin-top:14px}
-.modal-btn:hover{filter:brightness(1.08)}
-.modal-btn:disabled{opacity:.6}
-
-/* Profile Modal */
-.prof-top{display:flex;align-items:center;gap:32px;padding:24px 20px;border-bottom:1px solid var(--border)}
-.prof-right h2{font-size:20px;margin-bottom:6px}
-.prof-stats{display:flex;gap:24px;margin-bottom:14px}
-.stat{font-size:14px}
-.stat b{font-size:16px}
-.prof-actions{display:flex;gap:8px}
-.prof-btn{padding:8px 18px;border-radius:8px;font-weight:700;font-size:14px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer}
-.prof-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
-.prof-btn:hover{filter:brightness(1.06)}
-.prof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:3px}
-.prof-post{aspect-ratio:1;background:#eee;overflow:hidden;cursor:pointer;position:relative}
-.prof-post img{width:100%;height:100%;object-fit:cover;transition:transform .2s}
-.prof-post:hover img{transform:scale(1.04)}
-.prof-post-text{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8px;font-size:11px;color:#666;text-align:center}
-
-/* Messenger */
-.msg-layout{display:flex;height:540px}
-.msg-sidebar{width:140px;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
-.conv-item{padding:12px 8px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:4px;transition:background .15s}
-.conv-item:hover,.conv-item.active{background:var(--bg)}
-.conv-name{font-size:11px;font-weight:700;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-.msg-main{flex:1;display:flex;flex-direction:column;min-width:0}
-.msg-header{padding:14px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;background:var(--surface)}
-.msg-body{flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
-.msg-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:8px}
-.msg-empty i{font-size:52px}
-.bubble{max-width:75%;padding:10px 16px;border-radius:20px;font-size:14px;line-height:1.45;word-break:break-word}
-.bubble.mine{background:var(--primary);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-.bubble.theirs{background:var(--surface);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;border:1px solid var(--border)}
-.msg-input{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface)}
-.msg-input input{flex:1;border:1px solid var(--border);padding:10px 18px;border-radius:22px;background:var(--bg);color:var(--text);font-size:14px}
-.msg-input input:focus{border-color:var(--primary)}
-.msg-send{font-size:24px;color:var(--primary);cursor:pointer;transition:transform .15s;background:none;border:none}
-.msg-send:hover{transform:scale(1.1) rotate(-15deg)}
-
-/* Toast */
-.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:#262626;color:#fff;padding:12px 28px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snappic - Connect & Share</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- App Container -->
+    <div id="app" class="hidden">
+        <!-- Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="ri-leaf-fill"></i> Snappic
+            </div>
+            <div class="nav-items">
+                <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i> <span>Home</span></a>
+                <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i> <span>Explore</span></a>
+                <a href="#" class="nav-item" data-target="chat-view"><i class="ri-message-3-line"></i> <span>Messages</span><span class="badge" id="msg-badge" style="display:none">0</span></a>
+                <a href="#" class="nav-item" id="nav-profile" data-target="profile-view"><i class="ri-user-line"></i> <span>Profile</span></a>
+            </div>
+            <button class="create-btn" id="open-post-modal"><i class="ri-add-line"></i> <span>Create</span></button>
+            
+            <div class="user-mini">
+                <div class="avatar" id="nav-avatar"></div>
+                <div class="info">
+                    <div class="name" id="nav-username">User</div>
+                    <div class="status">Online <span id="online-count-badge">1</span></div>
+                </div>
+                <button id="logout-btn"><i class="ri-logout-circle-r-line"></i></button>
+            </div>
+        </nav>
 
-<!-- AUTH -->
-<div id="auth-page" class="auth-wrap">
-  <div id="login-card" class="auth-card">
-    <span class="auth-logo">Snappic</span>
-    <p id="login-err" class="auth-err"></p>
-    <input type="email" id="l-email" class="auth-inp" placeholder="Email address">
-    <input type="password" id="l-pass" class="auth-inp" placeholder="Password" onkeypress="if(event.key==='Enter')handleLogin()">
-    <button class="auth-btn" onclick="handleLogin()">Log In</button>
-    <p class="auth-switch">Don't have an account? <span onclick="toggleAuth()">Sign up</span></p>
-  </div>
-  <div id="signup-card" class="auth-card hidden">
-    <span class="auth-logo">Snappic</span>
-    <p id="signup-err" class="auth-err"></p>
-    <input type="text" id="s-user" class="auth-inp" placeholder="Username">
-    <input type="email" id="s-email" class="auth-inp" placeholder="Email address">
-    <input type="password" id="s-pass" class="auth-inp" placeholder="Password" onkeypress="if(event.key==='Enter')handleSignup()">
-    <button class="auth-btn" onclick="handleSignup()">Sign Up</button>
-    <p class="auth-switch">Already have an account? <span onclick="toggleAuth()">Log in</span></p>
-  </div>
-</div>
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Feed View -->
+            <section id="feed-view" class="view-section active">
+                <header class="mobile-header">
+                    <div class="logo"><i class="ri-leaf-fill"></i> Snappic</div>
+                    <button id="mobile-chat-btn"><i class="ri-message-3-line"></i></button>
+                </header>
 
-<!-- APP -->
-<div id="app-page" class="app-wrap">
-  <!-- Navbar -->
-  <nav class="nav">
-    <div class="nav-inner">
-      <a href="#" class="nav-logo" onclick="loadFeed()">Snappic</a>
-      <div class="nav-search-wrap">
-        <i class='bx bx-search nav-search-icon'></i>
-        <input type="text" id="search-inp" class="nav-search" placeholder="Search" oninput="doSearch(this.value)">
-        <div id="search-drop" class="search-drop"></div>
-      </div>
-      <div class="nav-icons">
-        <button class="nav-btn" onclick="loadFeed()" title="Home"><i class='bx bxs-home'></i></button>
-        <button class="nav-btn" onclick="openCreate()" title="New Post"><i class='bx bx-plus-square'></i></button>
-        <button class="nav-btn" id="msg-btn" onclick="openMsgs()" title="Messages"><i class='bx bx-message-circle'></i><div class="notif-dot" id="msg-dot"></div></button>
-        <button class="nav-btn" onclick="openMyProfile()" title="Profile"><i class='bx bx-user-circle'></i></button>
-        <button class="nav-btn" onclick="toggleDark()" title="Dark Mode"><i class='bx bx-moon' id="dark-icon"></i></button>
-        <button class="nav-btn" onclick="handleLogout()" title="Logout"><i class='bx bx-log-out'></i></button>
-      </div>
+                <div class="feed-container" id="feed-container">
+                    <!-- Posts load here -->
+                    <div style="text-align:center; padding: 2rem;"><i class="ri-loader-4-line ri-spin" style="font-size:2rem; color: var(--primary);"></i></div>
+                </div>
+            </section>
+
+            <!-- Search/Explore View -->
+            <section id="search-view" class="view-section hidden">
+                <div class="search-header" style="margin-bottom: 2rem;">
+                    <div class="input-group">
+                        <input type="text" id="search-input" placeholder="Search users by name...">
+                    </div>
+                </div>
+                <div class="search-results" id="search-results"></div>
+            </section>
+
+            <!-- Chat/Messages View -->
+            <section id="chat-view" class="view-section hidden">
+                <div class="chat-layout">
+                    <div class="chat-sidebar">
+                        <h3>Messages</h3>
+                        <div class="conversations-list" id="conversations-list">
+                            <!-- Convos here -->
+                        </div>
+                    </div>
+                    <div class="chat-area" id="chat-area">
+                        <div class="chat-empty" id="chat-empty-state">
+                            <i class="ri-message-3-line"></i>
+                            <p>Select a conversation to start chatting</p>
+                        </div>
+                        <div class="chat-active hidden" id="chat-active-state">
+                            <div class="chat-header">
+                                <button class="back-btn" id="close-chat-mobile"><i class="ri-arrow-left-line"></i></button>
+                                <div class="chat-user-info">
+                                    <div class="avatar" id="chat-active-avatar"></div>
+                                    <h4 id="chat-active-name">User</h4>
+                                </div>
+                            </div>
+                            <div class="messages-container" id="messages-container"></div>
+                            <div class="chat-input-area">
+                                <input type="text" id="message-input" placeholder="Type a message...">
+                                <button id="send-msg-btn"><i class="ri-send-plane-fill"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile View -->
+            <section id="profile-view" class="view-section hidden">
+                <div class="profile-header">
+                    <div class="profile-cover"></div>
+                    <div class="profile-info-container">
+                        <div class="avatar large" id="profile-avatar"></div>
+                        <div class="profile-details">
+                            <h2 id="profile-username">Username</h2>
+                            <p id="profile-bio" class="bio">Welcome to my Snappic profile!</p>
+                            <div class="stats">
+                                <div><strong id="profile-posts-count">0</strong> Posts</div>
+                                <div><strong id="profile-followers">0</strong> Followers</div>
+                                <div><strong id="profile-following">0</strong> Following</div>
+                            </div>
+                            <div class="profile-actions" id="profile-actions">
+                                <!-- Follow btn injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="profile-grid" id="profile-grid">
+                    <!-- User posts -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Right Sidebar (Trends/Suggestions) -->
+        <aside class="right-sidebar">
+            <div class="suggestions-card">
+                <h3>Suggested for you</h3>
+                <div class="suggestions-list" id="suggestions-list">
+                    <!-- Suggestions -->
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Find friends in Explore tab!</p>
+                </div>
+            </div>
+            <div class="footer-links">
+                &copy; 2024 Snappic. Built with <i class="ri-heart-fill"></i>
+            </div>
+        </aside>
+
+        <!-- Bottom Nav (Mobile) -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i></a>
+            <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i></a>
+            <button class="nav-item create-btn-mobile" id="open-post-modal-mobile"><i class="ri-add-line"></i></button>
+            <a href="#" class="nav-item" data-target="chat-view"><i class="ri-message-3-line"></i></a>
+            <a href="#" class="nav-item" id="nav-profile-mobile" data-target="profile-view"><i class="ri-user-line"></i></a>
+        </nav>
     </div>
-  </nav>
 
-  <!-- Main -->
-  <main class="main">
-    <div class="feed-col">
-      <div id="stories-bar" class="stories-bar"></div>
-      <div class="post-creator" onclick="openCreate()">
-        <div class="av lg" id="creator-av">?</div>
-        <div class="creator-text">What's on your mind?</div>
-        <i class='bx bx-image-add' style="font-size:24px; color:var(--muted)"></i>
-      </div>
-      <div id="feed"></div>
+    <!-- Auth Container -->
+    <div id="auth" class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo"><i class="ri-leaf-fill"></i> Snappic</div>
+            <h1 id="auth-title">Welcome back</h1>
+            <p class="auth-subtitle">Log in to see photos and videos from your friends.</p>
+            
+            <form id="auth-form">
+                <div class="input-group hidden" id="username-group">
+                    <input type="text" id="auth-username" placeholder="Username">
+                </div>
+                <div class="input-group">
+                    <input type="email" id="auth-email" placeholder="Email" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="auth-password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn-primary" id="auth-submit">Log In</button>
+            </form>
+            
+            <div class="auth-switch">
+                <span id="auth-switch-text">Don't have an account?</span>
+                <button id="auth-switch-btn">Sign up</button>
+            </div>
+        </div>
     </div>
 
-    <aside class="sidebar">
-      <div class="side-profile">
-        <div class="av lg" id="side-av">?</div>
-        <div class="side-info">
-          <div class="side-un" id="side-un">username</div>
-          <div class="side-name" id="side-name">Full Name</div>
+    <!-- Create Post Modal -->
+    <div class="modal" id="create-post-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Post</h3>
+                <button class="close-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="image-upload-area" id="image-upload-area">
+                    <i class="ri-image-add-line"></i>
+                    <p>Click or drag to upload image</p>
+                    <input type="file" id="post-image-input" accept="image/*" hidden>
+                    <img id="post-image-preview" class="hidden">
+                </div>
+                <textarea id="post-caption" placeholder="Write a caption..."></textarea>
+                <button class="btn-primary full-width" id="submit-post-btn">Share Post</button>
+            </div>
         </div>
-        <span class="side-switch" onclick="handleLogout()">Log out</span>
-      </div>
-      <div class="side-suggest-title">
-        <span>Suggested for you</span>
-        <span style="cursor:pointer; color:var(--text); font-weight:700; font-size:13px;">See All</span>
-      </div>
-      <div id="side-suggest">
-        <div class="suggest-item">
-          <div class="av" style="background:#e0e7ff; color:#4f46e5;">AR</div>
-          <div class="suggest-info"><div class="suggest-un">aryan_dev</div><div class="suggest-sub">Suggested for you</div></div>
-          <button class="follow-sm">Follow</button>
-        </div>
-        <div class="suggest-item">
-          <div class="av" style="background:#fce7f3; color:#db2777;">NK</div>
-          <div class="suggest-info"><div class="suggest-un">neha.k</div><div class="suggest-sub">Followed by amir</div></div>
-          <button class="follow-sm">Follow</button>
-        </div>
-        <div class="suggest-item">
-          <div class="av" style="background:#dcfce7; color:#16a34a;">SM</div>
-          <div class="suggest-info"><div class="suggest-un">sam_photos</div><div class="suggest-sub">New to Snappic</div></div>
-          <button class="follow-sm">Follow</button>
-        </div>
-      </div>
-      <div class="side-footer">
-        About · Help · Privacy · Terms · Locations<br>
-        © 2024 SNAPPIC PREMIUM
-      </div>
-    </aside>
-  </main>
-</div>
+    </div>
 
-<!-- CREATE MODAL -->
-<div id="create-modal" class="modal">
-  <div class="modal-box" style="max-width:480px">
-    <div class="modal-hd">
-      <span class="modal-title">Create new post</span>
-      <button class="modal-close" onclick="closeModal('create-modal')"><i class='bx bx-x'></i></button>
-    </div>
-    <div class="modal-body">
-      <img id="create-preview" src="" alt="Preview">
-      <label for="create-file" class="file-pick"><i class='bx bx-cloud-upload' style="font-size:28px; display:block; margin-bottom:6px"></i>Select from computer</label>
-      <input type="file" id="create-file" accept="image/*" hidden onchange="previewFile(this)">
-      <textarea id="create-caption" class="modal-textarea" placeholder="Write a caption..."></textarea>
-      <button id="share-btn" class="modal-btn" onclick="doPost()">Share</button>
-    </div>
-  </div>
-</div>
+    <!-- Notifications Toast -->
+    <div id="toast-container"></div>
 
-<!-- PROFILE MODAL -->
-<div id="prof-modal" class="modal">
-  <div class="modal-box" style="max-width:640px">
-    <div class="modal-hd">
-      <span class="modal-title" id="prof-modal-un">Profile</span>
-      <button class="modal-close" onclick="closeModal('prof-modal')"><i class='bx bx-x'></i></button>
-    </div>
-    <div class="prof-top">
-      <div class="av xl" id="p-av">?</div>
-      <div class="prof-right">
-        <h2 id="p-un">username</h2>
-        <div class="prof-stats">
-          <div class="stat"><b id="p-posts">0</b> posts</div>
-          <div class="stat"><b id="p-followers">0</b> followers</div>
-          <div class="stat"><b id="p-following">0</b> following</div>
-        </div>
-        <div class="prof-actions">
-          <button id="p-follow-btn" class="prof-btn primary" onclick="doFollow()">Follow</button>
-          <button id="p-msg-btn" class="prof-btn" onclick="doMsgProfile()">Message</button>
-        </div>
-      </div>
-    </div>
-    <div id="prof-grid" class="prof-grid"></div>
-  </div>
-</div>
-
-<!-- MESSENGER MODAL -->
-<div id="msg-modal" class="modal">
-  <div class="modal-box" style="max-width:780px; height:600px; overflow:hidden">
-    <div class="modal-hd">
-      <span class="modal-title">Direct Messages</span>
-      <button class="modal-close" onclick="closeModal('msg-modal')"><i class='bx bx-x'></i></button>
-    </div>
-    <div class="msg-layout">
-      <div class="msg-sidebar" id="conv-list"></div>
-      <div class="msg-main">
-        <div id="msg-header" class="msg-header">Select a conversation</div>
-        <div id="msg-body" class="msg-body">
-          <div class="msg-empty">
-            <i class='bx bx-message-square-dots'></i>
-            <b>Your Messages</b>
-            <p style="font-size:13px">Send a message to start chatting.</p>
-          </div>
-        </div>
-        <div id="msg-input-bar" class="msg-input hidden">
-          <input type="text" id="msg-text" placeholder="Message..." onkeypress="if(event.key==='Enter')sendDM()">
-          <button class="msg-send" onclick="sendDM()"><i class='bx bxs-send'></i></button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="toast" class="toast"></div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="app.js"></script>
-<script>
-function toggleDark(){
-  const d=document.body.getAttribute('data-theme')==='dark';
-  document.body.setAttribute('data-theme',d?'light':'dark');
-  const i=document.getElementById('dark-icon');
-  i.className=d?'bx bx-moon':'bx bx-sun';
-}
-</script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
