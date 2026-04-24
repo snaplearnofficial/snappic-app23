@@ -70,6 +70,7 @@ const userSchema = new mongoose.Schema({
   bio: { type: String, default: '' },
   followers: { type: [String], default: [] },
   following: { type: [String], default: [] },
+  chatTheme: { type: String, default: 'default' },
   createdAt: { type: Date, default: Date.now }
 });
 const User = mongoose.model('User', userSchema);
@@ -79,6 +80,7 @@ const postSchema = new mongoose.Schema({
   authorId: String,
   caption: String,
   image: String,
+  postType: { type: String, default: 'post' }, // 'post' or 'note'
   likes: { type: [String], default: [] },
   comments: { type: Array, default: [] },
   createdAt: { type: Date, default: Date.now }
@@ -162,6 +164,33 @@ app.get('/api/me', auth, async (req, res) => {
   }
 });
 
+app.post('/api/users/avatar', auth, async (req, res) => {
+  try {
+    const { avatar } = req.body;
+    if (!avatar) return res.status(400).json({ error: 'Avatar image required' });
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.avatar = avatar;
+    await user.save();
+    res.json({ success: true, avatar });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/users/theme', auth, async (req, res) => {
+  try {
+    const { chatTheme } = req.body;
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.chatTheme = chatTheme || 'default';
+    await user.save();
+    res.json({ success: true, chatTheme: user.chatTheme });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── USER & SOCIAL ROUTES ─────────────────────────────
 app.get('/api/users/search', auth, async (req, res) => {
   const { q } = req.query;
@@ -220,6 +249,7 @@ app.get('/api/posts', auth, async (req, res) => {
         author: { id: author.id, username: author.username, avatar: author.avatar },
         caption: p.caption, 
         image: p.image, 
+        postType: p.postType || 'post',
         likes: p.likes.length,
         isLiked: p.likes.includes(req.user.id),
         comments: p.comments.slice(-5),
@@ -233,8 +263,8 @@ app.get('/api/posts', auth, async (req, res) => {
 
 app.post('/api/posts', auth, async (req, res) => {
   try {
-    const { caption, image } = req.body;
-    const post = new Post({ id: generateId(), authorId: req.user.id, caption, image: image || null });
+    const { caption, image, postType } = req.body;
+    const post = new Post({ id: generateId(), authorId: req.user.id, caption, image: image || null, postType: postType || 'post' });
     await post.save();
     
     const author = await User.findOne({ id: req.user.id });
@@ -243,6 +273,7 @@ app.post('/api/posts', auth, async (req, res) => {
       author: { id: author.id, username: author.username, avatar: author.avatar }, 
       caption: post.caption, 
       image: post.image, 
+      postType: post.postType,
       likes: 0, 
       isLiked: false, 
       comments: [], 
@@ -253,6 +284,20 @@ app.post('/api/posts', auth, async (req, res) => {
     io.emit('new_post', data);
     res.json({ success: true, post: data });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/posts/:id', auth, async (req, res) => {
+  try {
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    if (post.authorId !== req.user.id) return res.status(403).json({ error: 'Unauthorized' });
+    
+    await Post.deleteOne({ id: req.params.id });
+    io.emit('post_deleted', { postId: post.id });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/posts/:id/like', auth, async (req, res) => {

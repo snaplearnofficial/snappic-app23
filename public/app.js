@@ -34,6 +34,13 @@ const escapeHtml = (unsafe) => {
          .replace(/'/g, "&#039;");
 };
 
+const getAvatarHtml = (avatarStr) => {
+    if (avatarStr && avatarStr.startsWith('data:image')) {
+        return `<img src="${avatarStr}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
+    return avatarStr || '';
+};
+
 // Auth Logic
 let isLoginMode = true;
 const authContainer = document.getElementById('auth');
@@ -99,7 +106,7 @@ async function initApp() {
 
         // Setup User Info
         document.getElementById('nav-username').innerText = currentUser.username;
-        document.getElementById('nav-avatar').innerText = currentUser.avatar;
+        document.getElementById('nav-avatar').innerHTML = getAvatarHtml(currentUser.avatar);
 
         initSocket();
         loadFeed();
@@ -163,6 +170,7 @@ imageInput.addEventListener('change', (e) => {
 
 document.getElementById('submit-post-btn').addEventListener('click', async () => {
     const caption = document.getElementById('post-caption').value;
+    const postType = document.getElementById('post-type-select').value;
     if (!caption && !selectedImageBase64) return showToast('Please add an image or caption');
 
     document.getElementById('submit-post-btn').innerText = 'Posting...';
@@ -174,7 +182,7 @@ document.getElementById('submit-post-btn').addEventListener('click', async () =>
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}`
             },
-            body: JSON.stringify({ caption, image: selectedImageBase64 })
+            body: JSON.stringify({ caption, image: selectedImageBase64, postType })
         });
         
         if (res.ok) {
@@ -193,6 +201,7 @@ function resetPostModal() {
     imagePreview.src = '';
     imagePreview.classList.add('hidden');
     document.getElementById('post-caption').value = '';
+    document.getElementById('post-type-select').value = 'post';
     imageInput.value = '';
 }
 
@@ -234,15 +243,17 @@ function createPostElement(post) {
     div.innerHTML = `
         <div class="post-header">
             <div class="post-user" onclick="loadProfile('${post.author.id}')">
-                <div class="avatar">${post.author.avatar}</div>
+                <div class="avatar">${getAvatarHtml(post.author.avatar)}</div>
                 <div>
                     <div class="name">${escapeHtml(post.author.username)}</div>
                     <div class="time">${formatTime(post.createdAt)}</div>
                 </div>
             </div>
-            <button class="post-opt"><i class="ri-more-2-fill"></i></button>
+            <button class="post-opt" ${post.author.id === currentUser.id ? `onclick="deletePost('${post.id}')" title="Delete Post"` : ''}>
+                <i class="${post.author.id === currentUser.id ? 'ri-delete-bin-line' : 'ri-more-2-fill'}" ${post.author.id === currentUser.id ? 'style="color: #ef4444;"' : ''}></i>
+            </button>
         </div>
-        ${post.image ? `<img src="${post.image}" class="post-image" loading="lazy">` : ''}
+        ${post.image ? `<img src="${post.image}" class="post-image" loading="lazy" onclick="openImageViewer('${post.image}')" style="cursor: zoom-in;">` : ''}
         <div class="post-caption">
             <strong>${escapeHtml(post.author.username)}</strong> ${escapeHtml(post.caption)}
         </div>
@@ -277,9 +288,30 @@ window.toggleLike = async (postId) => {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}` }
         });
         const data = await res.json();
-        // UI updates handled by socket
     } catch (e) {
         console.error(e);
+    }
+};
+
+window.deletePost = async (postId) => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    try {
+        const res = await fetch(API_URL + `/api/posts/${postId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Post deleted!');
+            // DOM update handled by socket
+            if (document.getElementById('profile-view').classList.contains('hidden') === false) {
+                // Refresh profile if we are on it
+                loadProfile(currentUser.id);
+            }
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Failed to delete post');
     }
 };
 
@@ -331,7 +363,7 @@ document.getElementById('search-input').addEventListener('input', async (e) => {
             div.className = 'search-user-card';
             div.innerHTML = `
                 <div style="display:flex; align-items:center; gap:1rem;">
-                    <div class="avatar">${u.avatar}</div>
+                    <div class="avatar">${getAvatarHtml(u.avatar)}</div>
                     <strong style="font-size:1.1rem">${escapeHtml(u.username)}</strong>
                 </div>
                 <button class="btn-primary" style="padding: 6px 15px; border-radius: 20px;">View</button>
@@ -359,7 +391,7 @@ async function loadSuggestions() {
             div.className = 'suggestion-item';
             div.innerHTML = `
                 <div class="suggestion-user" onclick="loadProfile('${u.id}')">
-                    <div class="avatar">${u.avatar}</div>
+                    <div class="avatar">${getAvatarHtml(u.avatar)}</div>
                     <div class="name">${escapeHtml(u.username)}</div>
                 </div>
                 <button class="follow-btn-small" onclick="loadProfile('${u.id}')">View</button>
@@ -381,7 +413,7 @@ window.loadProfile = async (userId) => {
         
         const user = data.user;
         document.getElementById('profile-username').innerText = user.username;
-        document.getElementById('profile-avatar').innerText = user.avatar;
+        document.getElementById('profile-avatar').innerHTML = getAvatarHtml(user.avatar);
         document.getElementById('profile-posts-count').innerText = data.posts.length;
         document.getElementById('profile-followers').innerText = user.followers;
         document.getElementById('profile-following').innerText = user.following;
@@ -409,19 +441,25 @@ window.loadProfile = async (userId) => {
             actionsDiv.appendChild(editBtn);
         }
         
-        const grid = document.getElementById('profile-grid');
-        grid.innerHTML = '';
+        const gridPost = document.getElementById('profile-grid-post');
+        const gridNote = document.getElementById('profile-grid-note');
+        gridPost.innerHTML = '';
+        gridNote.innerHTML = '';
         data.posts.forEach(p => {
             const div = document.createElement('div');
             div.className = 'grid-post';
             div.innerHTML = `
-                ${p.image ? `<img src="${p.image}" loading="lazy">` : `<div style="padding:1rem; height:100%; display:flex; align-items:center; text-align:center;">${escapeHtml(p.caption)}</div>`}
+                ${p.image ? `<img src="${p.image}" loading="lazy" onclick="openImageViewer('${p.image}')" style="cursor: zoom-in;">` : `<div style="padding:1rem; height:100%; display:flex; align-items:center; text-align:center;">${escapeHtml(p.caption)}</div>`}
                 <div class="grid-post-overlay">
                     <span><i class="ri-heart-3-fill"></i> ${p.likes.length}</span>
                     <span><i class="ri-chat-3-fill"></i> ${p.comments.length}</span>
                 </div>
             `;
-            grid.appendChild(div);
+            if (p.postType === 'note') {
+                gridNote.appendChild(div);
+            } else {
+                gridPost.appendChild(div);
+            }
         });
         
         document.querySelectorAll('.view-section').forEach(sec => sec.classList.add('hidden'));
@@ -465,7 +503,7 @@ async function loadConversations() {
             div.className = `convo-item ${u.id === currentChatUserId ? 'active' : ''}`;
             div.onclick = () => openChat(u.id, u.username, u.avatar);
             div.innerHTML = `
-                <div class="avatar">${u.avatar}</div>
+                <div class="avatar">${getAvatarHtml(u.avatar)}</div>
                 <div class="convo-info">
                     <div class="convo-name">${escapeHtml(u.username)}</div>
                 </div>
@@ -482,7 +520,11 @@ window.openChat = async (userId, username, avatar) => {
     document.getElementById('chat-empty-state').classList.add('hidden');
     document.getElementById('chat-active-state').classList.remove('hidden');
     document.getElementById('chat-active-name').innerText = username;
-    document.getElementById('chat-active-avatar').innerText = avatar;
+    document.getElementById('chat-active-avatar').innerHTML = getAvatarHtml(avatar);
+    
+    // Apply theme
+    applyChatTheme(currentUser.chatTheme || 'default');
+    document.getElementById('chat-theme-select').value = currentUser.chatTheme || 'default';
     
     // Mobile view switch
     if (window.innerWidth <= 768) {
@@ -605,6 +647,11 @@ function initSocket() {
         }
     });
     
+    socket.on('post_deleted', ({ postId }) => {
+        const postCard = document.getElementById(`post-${postId}`);
+        if (postCard) postCard.remove();
+    });
+    
     socket.on('new_direct_message', (msg) => {
         if (msg.senderId === currentChatUserId || msg.senderId === currentUser.id) {
             appendMessage(msg);
@@ -620,6 +667,121 @@ function initSocket() {
 
 document.getElementById('mobile-chat-btn').addEventListener('click', () => {
     document.querySelectorAll('.nav-item[data-target="chat-view"]')[0].click();
+});
+
+// Avatar Upload
+document.getElementById('profile-avatar').addEventListener('click', () => {
+    if (document.getElementById('profile-view').classList.contains('hidden')) return;
+    // Only allow changing own avatar (the button is only visible for own profile if we set it right, actually the avatar is always there, let's just check if it's our profile)
+    // Actually, when loading profile, we only add "Edit Profile" if it's our profile.
+    // Let's just trigger it. We will verify on the backend anyway.
+    if (document.getElementById('profile-username').innerText === currentUser.username) {
+        document.getElementById('avatar-upload-input').click();
+    }
+});
+
+document.getElementById('avatar-upload-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const base64 = event.target.result;
+        try {
+            const res = await fetch(API_URL + '/api/users/avatar', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('snappic_token')}`
+                },
+                body: JSON.stringify({ avatar: base64 })
+            });
+            const data = await res.json();
+            if (data.success) {
+                currentUser.avatar = data.avatar;
+                document.getElementById('nav-avatar').innerHTML = getAvatarHtml(currentUser.avatar);
+                document.getElementById('profile-avatar').innerHTML = getAvatarHtml(currentUser.avatar);
+                showToast('Profile picture updated!');
+            }
+        } catch (error) {
+            showToast('Failed to update profile picture');
+        }
+    };
+    reader.readAsDataURL(file);
+});
+
+// Chat Themes
+document.getElementById('chat-theme-select').addEventListener('change', async (e) => {
+    const theme = e.target.value;
+    applyChatTheme(theme);
+    
+    try {
+        await fetch(API_URL + '/api/users/theme', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('snappic_token')}`
+            },
+            body: JSON.stringify({ chatTheme: theme })
+        });
+        currentUser.chatTheme = theme;
+    } catch (error) {
+        console.error('Failed to save theme');
+    }
+});
+
+function applyChatTheme(theme) {
+    const container = document.getElementById('messages-container');
+    if (theme === 'whatsapp') {
+        container.style.backgroundColor = '#efeae2';
+        container.style.backgroundImage = 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")';
+        container.style.backgroundRepeat = 'repeat';
+        container.style.backgroundSize = '400px';
+        container.style.backgroundBlendMode = 'normal';
+    } else if (theme === 'dark') {
+        container.style.backgroundColor = '#0f172a';
+        container.style.backgroundImage = 'none';
+    } else {
+        container.style.backgroundColor = 'transparent';
+        container.style.backgroundImage = 'none';
+    }
+}
+
+// Image Viewer
+window.openImageViewer = (src) => {
+    document.getElementById('image-viewer-img').src = src;
+    document.getElementById('image-viewer-modal').classList.add('active');
+};
+
+document.getElementById('close-image-viewer').addEventListener('click', () => {
+    document.getElementById('image-viewer-modal').classList.remove('active');
+});
+
+document.getElementById('image-viewer-img').addEventListener('click', () => {
+    document.getElementById('image-viewer-modal').classList.remove('active');
+});
+
+// Profile Tabs
+document.querySelectorAll('.profile-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.profile-tab').forEach(t => {
+            t.classList.remove('active');
+            t.style.borderBottomColor = 'transparent';
+            t.style.color = 'var(--text-muted)';
+        });
+        tab.classList.add('active');
+        tab.style.borderBottomColor = 'var(--primary)';
+        tab.style.color = 'var(--text-main)';
+        
+        const type = tab.getAttribute('data-type');
+        if (type === 'note') {
+            document.getElementById('profile-grid-post').classList.add('hidden');
+            document.getElementById('profile-grid-note').classList.remove('hidden');
+        } else {
+            document.getElementById('profile-grid-note').classList.add('hidden');
+            document.getElementById('profile-grid-post').classList.remove('hidden');
+        }
+    });
 });
 
 // Run Init

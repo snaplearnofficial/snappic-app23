@@ -80,6 +80,13 @@
                                     <div class="avatar" id="chat-active-avatar"></div>
                                     <h4 id="chat-active-name">User</h4>
                                 </div>
+                                <div class="chat-theme-selector" style="margin-left: auto;">
+                                    <select id="chat-theme-select" style="padding: 5px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.9rem; outline: none;">
+                                        <option value="default">Default</option>
+                                        <option value="whatsapp">Doodle</option>
+                                        <option value="dark">Dark Solid</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="messages-container" id="messages-container"></div>
                             <div class="chat-input-area">
@@ -96,7 +103,8 @@
                 <div class="profile-header">
                     <div class="profile-cover"></div>
                     <div class="profile-info-container">
-                        <div class="avatar large" id="profile-avatar"></div>
+                        <div class="avatar large" id="profile-avatar" style="cursor: pointer;" title="Click to change profile picture"></div>
+                        <input type="file" id="avatar-upload-input" accept="image/*" hidden>
                         <div class="profile-details">
                             <h2 id="profile-username">Username</h2>
                             <p id="profile-bio" class="bio">Welcome to my Snappic profile!</p>
@@ -111,8 +119,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="profile-grid" id="profile-grid">
+                <div class="profile-tabs" style="display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+                    <button class="profile-tab active" data-type="post" style="flex: 1; padding: 1rem; background: none; border: none; color: var(--text-main); font-weight: bold; cursor: pointer; border-bottom: 2px solid var(--primary); transition: all 0.2s;">Photos</button>
+                    <button class="profile-tab" data-type="note" style="flex: 1; padding: 1rem; background: none; border: none; color: var(--text-muted); font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;">School Notes</button>
+                </div>
+                <div class="profile-grid" id="profile-grid-post">
                     <!-- User posts -->
+                </div>
+                <div class="profile-grid hidden" id="profile-grid-note">
+                    <!-- User notes -->
                 </div>
             </section>
         </main>
@@ -182,10 +197,20 @@
                     <input type="file" id="post-image-input" accept="image/*" hidden>
                     <img id="post-image-preview" class="hidden">
                 </div>
+                <select id="post-type-select" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); margin-bottom: 1rem; outline: none;">
+                    <option value="post">Standard Photo</option>
+                    <option value="note">School Note</option>
+                </select>
                 <textarea id="post-caption" placeholder="Write a caption..."></textarea>
                 <button class="btn-primary full-width" id="submit-post-btn">Share Post</button>
             </div>
         </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div class="modal" id="image-viewer-modal" style="z-index: 1000;">
+        <button class="close-modal" id="close-image-viewer" style="position: absolute; top: 1rem; right: 1rem; z-index: 10; font-size: 2.5rem; background: rgba(0,0,0,0.5); border-radius: 50%; padding: 5px;"><i class="ri-close-line"></i></button>
+        <img id="image-viewer-img" src="" style="max-width: 95vw; max-height: 95vh; object-fit: contain; cursor: zoom-out;">
     </div>
 
     <!-- Notifications Toast -->
