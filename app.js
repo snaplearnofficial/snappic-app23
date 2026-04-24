@@ -5,6 +5,7 @@ let currentChatUserId = null;
 let socket = null;
 let allUsersCache = {};
 let unreadMessages = 0;
+let unreadNotifications = 0;
 
 // Utility functions
 const showToast = (msg) => {
@@ -111,6 +112,7 @@ async function initApp() {
         initSocket();
         loadFeed();
         loadSuggestions();
+        loadNotifications();
     } catch (e) {
         console.error(e);
     }
@@ -136,6 +138,11 @@ document.querySelectorAll('.nav-item[data-target]').forEach(item => {
             loadProfile(currentUser.id);
         } else if (target === 'feed-view') {
             loadFeed();
+        } else if (target === 'notifications-view') {
+            unreadNotifications = 0;
+            updateBadge();
+            markNotificationsRead();
+            loadNotifications();
         }
     });
 });
@@ -438,6 +445,7 @@ window.loadProfile = async (userId) => {
             const editBtn = document.createElement('button');
             editBtn.className = 'btn-secondary';
             editBtn.innerText = 'Edit Profile';
+            editBtn.onclick = () => document.getElementById('avatar-upload-input').click();
             actionsDiv.appendChild(editBtn);
         }
         
@@ -586,13 +594,81 @@ function scrollToBottom() {
 }
 
 function updateBadge() {
-    const badge = document.getElementById('msg-badge');
+    const msgBadge = document.getElementById('msg-badge');
+    const mobileMsgBadge = document.getElementById('mobile-msg-badge');
+    const notifBadge = document.getElementById('notif-badge');
+    const mobileNotifBadge = document.getElementById('mobile-notif-badge');
+    
     if (unreadMessages > 0) {
-        badge.innerText = unreadMessages;
-        badge.style.display = 'block';
+        msgBadge.innerText = unreadMessages;
+        msgBadge.style.display = 'block';
+        if (mobileMsgBadge) { mobileMsgBadge.innerText = unreadMessages; mobileMsgBadge.style.display = 'block'; }
     } else {
-        badge.style.display = 'none';
+        msgBadge.style.display = 'none';
+        if (mobileMsgBadge) mobileMsgBadge.style.display = 'none';
     }
+    
+    if (unreadNotifications > 0) {
+        if(notifBadge) notifBadge.style.display = 'block';
+        if(mobileNotifBadge) mobileNotifBadge.style.display = 'block';
+    } else {
+        if(notifBadge) notifBadge.style.display = 'none';
+        if(mobileNotifBadge) mobileNotifBadge.style.display = 'none';
+    }
+}
+
+// Notifications Logic
+async function loadNotifications() {
+    try {
+        const res = await fetch(API_URL + '/api/notifications', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}` }
+        });
+        const data = await res.json();
+        
+        const list = document.getElementById('notifications-list');
+        if (!list) return;
+        list.innerHTML = '';
+        
+        if (!data.notifications || data.notifications.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding: 2rem; color: var(--text-muted);">No new notifications</div>';
+            return;
+        }
+        
+        data.notifications.forEach(n => {
+            const div = document.createElement('div');
+            div.style = "display:flex; align-items:center; gap: 1rem; padding: 10px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border);";
+            
+            let text = '';
+            if (n.type === 'like') text = 'liked your post.';
+            if (n.type === 'comment') text = 'commented on your post.';
+            if (n.type === 'follow') text = 'started following you.';
+            
+            div.innerHTML = `
+                <div class="avatar">${getAvatarHtml(n.senderAvatar)}</div>
+                <div style="flex:1;">
+                    <strong>${escapeHtml(n.senderUsername)}</strong> ${text}
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">${formatTime(n.createdAt)}</div>
+                </div>
+                ${!n.read ? '<div style="width:10px; height:10px; background:var(--primary); border-radius:50%;"></div>' : ''}
+            `;
+            div.onclick = () => {
+                if(n.type === 'follow') loadProfile(n.senderId);
+                // Can add post viewing for like/comment later
+            };
+            list.appendChild(div);
+        });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function markNotificationsRead() {
+    try {
+        await fetch(API_URL + '/api/notifications/read', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}` }
+        });
+    } catch(e) {}
 }
 
 // Socket Initialization
@@ -662,6 +738,13 @@ function initSocket() {
             updateBadge();
             loadConversations(); // refresh list to show new sender
         }
+    });
+    
+    socket.on('new_notification', (notif) => {
+        showToast('New notification!');
+        unreadNotifications++;
+        updateBadge();
+        loadNotifications();
     });
 }
 

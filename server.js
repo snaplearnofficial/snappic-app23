@@ -96,6 +96,19 @@ const messageSchema = new mongoose.Schema({
 });
 const Message = mongoose.model('Message', messageSchema);
 
+const notificationSchema = new mongoose.Schema({
+  id: String,
+  userId: String,
+  type: String, // 'like', 'comment', 'follow'
+  senderId: String,
+  senderUsername: String,
+  senderAvatar: String,
+  postId: String,
+  read: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+const Notification = mongoose.model('Notification', notificationSchema);
+
 // Utils
 function generateId() { return Math.random().toString(36).substr(2, 9) + Date.now().toString(36); }
 const JWT_SECRET = process.env.JWT_SECRET || 'snappic_premium_secret_2024';
@@ -191,6 +204,20 @@ app.post('/api/users/theme', auth, async (req, res) => {
   }
 });
 
+app.get('/api/notifications', auth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 }).limit(20);
+    res.json({ notifications });
+  } catch(e) { res.status(500).json({error: e.message}) }
+});
+
+app.post('/api/notifications/read', auth, async (req, res) => {
+  try {
+    await Notification.updateMany({ userId: req.user.id }, { read: true });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({error: e.message}) }
+});
+
 // ─── USER & SOCIAL ROUTES ─────────────────────────────
 app.get('/api/users/search', auth, async (req, res) => {
   const { q } = req.query;
@@ -233,6 +260,14 @@ app.post('/api/users/:id/follow', auth, async (req, res) => {
   } else {
     target.followers.push(req.user.id);
     me.following.push(target.id);
+    
+    // Notification
+    const notif = new Notification({
+      id: generateId(), userId: target.id, type: 'follow', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar
+    });
+    await notif.save();
+    const receiverSocketId = userToSocket[target.id];
+    if (receiverSocketId) io.to(receiverSocketId).emit('new_notification', notif);
   }
   await target.save(); await me.save();
   res.json({ success: true, isFollowing: target.followers.includes(req.user.id), followers: target.followers.length });
@@ -313,6 +348,15 @@ app.post('/api/posts/:id/like', auth, async (req, res) => {
     } else { 
       post.likes.push(req.user.id); 
       liked = true; 
+      
+      if (post.authorId !== req.user.id) {
+        const notif = new Notification({
+          id: generateId(), userId: post.authorId, type: 'like', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar, postId: post.id
+        });
+        await notif.save();
+        const receiverSocketId = userToSocket[post.authorId];
+        if (receiverSocketId) io.to(receiverSocketId).emit('new_notification', notif);
+      }
     }
     
     await post.save();
@@ -332,6 +376,15 @@ app.post('/api/posts/:id/comment', auth, async (req, res) => {
     const comment = { username: req.user.username, text, createdAt: new Date().toISOString() };
     post.comments.push(comment);
     await post.save();
+    
+    if (post.authorId !== req.user.id) {
+        const notif = new Notification({
+          id: generateId(), userId: post.authorId, type: 'comment', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar, postId: post.id
+        });
+        await notif.save();
+        const receiverSocketId = userToSocket[post.authorId];
+        if (receiverSocketId) io.to(receiverSocketId).emit('new_notification', notif);
+    }
     
     io.emit('new_comment', { postId: post.id, comment, commentCount: post.comments.length });
     res.json({ success: true, comment });

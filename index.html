@@ -20,6 +20,7 @@
                 <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i> <span>Home</span></a>
                 <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i> <span>Explore</span></a>
                 <a href="#" class="nav-item" data-target="chat-view"><i class="ri-message-3-line"></i> <span>Messages</span><span class="badge" id="msg-badge" style="display:none">0</span></a>
+                <a href="#" class="nav-item" data-target="notifications-view" id="nav-notifications"><i class="ri-heart-3-line"></i> <span>Notifications</span><span class="badge" id="notif-badge" style="display:none">0</span></a>
                 <a href="#" class="nav-item" id="nav-profile" data-target="profile-view"><i class="ri-user-line"></i> <span>Profile</span></a>
             </div>
             <button class="create-btn" id="open-post-modal"><i class="ri-add-line"></i> <span>Create</span></button>
@@ -130,6 +131,16 @@
                     <!-- User notes -->
                 </div>
             </section>
+
+            <!-- Notifications View -->
+            <section class="view-section hidden" id="notifications-view" style="max-width: 600px; margin: 0 auto; width: 100%;">
+                <div class="header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
+                    <h2>Notifications</h2>
+                </div>
+                <div id="notifications-list" style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Notification items -->
+                </div>
+            </section>
         </main>
 
         <!-- Right Sidebar (Trends/Suggestions) -->
@@ -151,7 +162,14 @@
             <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i></a>
             <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i></a>
             <button class="nav-item create-btn-mobile" id="open-post-modal-mobile"><i class="ri-add-line"></i></button>
-            <a href="#" class="nav-item" data-target="chat-view"><i class="ri-message-3-line"></i></a>
+            <a href="#" class="nav-item" data-target="chat-view" style="position:relative;">
+                <i class="ri-message-3-line"></i>
+                <div class="badge" id="mobile-msg-badge" style="display:none; position:absolute; top:10px; right:15px; background:red; color:white; border-radius:50%; width:8px; height:8px; font-size:0;"></div>
+            </a>
+            <a href="#" class="nav-item" data-target="notifications-view" style="position:relative;">
+                <i class="ri-heart-3-line"></i>
+                <div class="badge" id="mobile-notif-badge" style="display:none; position:absolute; top:10px; right:15px; background:var(--primary); color:white; border-radius:50%; width:8px; height:8px; font-size:0;"></div>
+            </a>
             <a href="#" class="nav-item" id="nav-profile-mobile" data-target="profile-view"><i class="ri-user-line"></i></a>
         </nav>
     </div>
