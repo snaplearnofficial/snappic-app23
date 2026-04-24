@@ -20,6 +20,7 @@
                 <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i> <span>Home</span></a>
                 <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i> <span>Explore</span></a>
                 <a href="#" class="nav-item" data-target="chat-view"><i class="ri-message-3-line"></i> <span>Messages</span><span class="badge" id="msg-badge" style="display:none">0</span></a>
+                <a href="#" class="nav-item" data-target="rooms-view"><i class="ri-live-line"></i> <span>Campus Rooms</span></a>
                 <a href="#" class="nav-item" data-target="notifications-view" id="nav-notifications"><i class="ri-heart-3-line"></i> <span>Notifications</span><span class="badge" id="notif-badge" style="display:none">0</span></a>
                 <a href="#" class="nav-item" id="nav-profile" data-target="profile-view"><i class="ri-user-line"></i> <span>Profile</span></a>
             </div>
@@ -44,6 +45,13 @@
                     <button id="mobile-chat-btn"><i class="ri-message-3-line"></i></button>
                 </header>
 
+                <div id="daily-prompt-banner" class="hidden" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 15px; border-radius: var(--radius-lg); margin-bottom: 20px; box-shadow: 0 10px 20px rgba(11,92,71,0.2);">
+                    <h3 style="margin-bottom: 5px; display: flex; align-items: center; gap: 8px;"><i class="ri-fire-fill"></i> Daily Prompt</h3>
+                    <p id="daily-prompt-text" style="font-size: 1.1rem; font-weight: 500;">Loading prompt...</p>
+                </div>
+                <div id="prompt-responses-container" class="hidden" style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 10px; scrollbar-width: none;">
+                    <!-- Horizontal bubbles for prompt responses -->
+                </div>
                 <div class="feed-container" id="feed-container">
                     <!-- Posts load here -->
                     <div style="text-align:center; padding: 2rem;"><i class="ri-loader-4-line ri-spin" style="font-size:2rem; color: var(--primary);"></i></div>
@@ -93,6 +101,41 @@
                             <div class="chat-input-area">
                                 <input type="text" id="message-input" placeholder="Type a message...">
                                 <button id="send-msg-btn"><i class="ri-send-plane-fill"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Live Rooms View -->
+            <section id="rooms-view" class="view-section hidden">
+                <div class="chat-layout">
+                    <div class="chat-sidebar">
+                        <h3>Campus Rooms <br><span style="font-size:0.8rem; color:var(--text-muted); font-weight:normal;">Live ephemeral chat</span></h3>
+                        <div class="conversations-list" id="rooms-list">
+                            <div class="convo-item active" onclick="joinRoom('library', this)">
+                                <div class="avatar" style="background:#e0f2fe; color:#0284c7"><i class="ri-book-open-line"></i></div>
+                                <div class="convo-name">Library Grind</div>
+                            </div>
+                            <div class="convo-item" onclick="joinRoom('chill', this)">
+                                <div class="avatar" style="background:#fef08a; color:#ca8a04"><i class="ri-cup-line"></i></div>
+                                <div class="convo-name">Late Night Chill</div>
+                            </div>
+                            <div class="convo-item" onclick="joinRoom('confessions', this)">
+                                <div class="avatar" style="background:#fce7f3; color:#db2777"><i class="ri-ghost-line"></i></div>
+                                <div class="convo-name">Confessions (Anon)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-area" id="room-chat-area">
+                        <div class="chat-active" id="room-active-state" style="opacity:0;">
+                            <div class="chat-header">
+                                <h4 id="room-active-name">Select a Room</h4>
+                            </div>
+                            <div class="messages-container" id="room-messages-container" style="background:var(--bg-main);"></div>
+                            <div class="chat-input-area">
+                                <input type="text" id="room-message-input" placeholder="Message the room...">
+                                <button id="send-room-msg-btn"><i class="ri-send-plane-fill"></i></button>
                             </div>
                         </div>
                     </div>
@@ -162,6 +205,7 @@
             <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i></a>
             <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i></a>
             <button class="nav-item create-btn-mobile" id="open-post-modal-mobile"><i class="ri-add-line"></i></button>
+            <a href="#" class="nav-item" data-target="rooms-view"><i class="ri-live-line"></i></a>
             <a href="#" class="nav-item" data-target="chat-view" style="position:relative;">
                 <i class="ri-message-3-line"></i>
                 <div class="badge" id="mobile-msg-badge" style="display:none; position:absolute; top:10px; right:15px; background:red; color:white; border-radius:50%; width:8px; height:8px; font-size:0;"></div>
@@ -218,6 +262,16 @@
                 <select id="post-type-select" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); margin-bottom: 1rem; outline: none;">
                     <option value="post">Standard Photo</option>
                     <option value="note">School Note</option>
+                </select>
+                <label style="display:flex; align-items:center; gap:10px; margin-bottom:1rem; cursor:pointer; background:var(--bg-main); padding:10px; border-radius:12px;">
+                    <input type="checkbox" id="post-is-prompt" style="width:18px; height:18px; accent-color: var(--primary);">
+                    <span style="font-size:0.95rem; font-weight:500;">Submit to Daily Prompt <i class="ri-fire-fill" style="color:var(--accent);"></i></span>
+                </label>
+                <select id="post-unlock-select" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); margin-bottom: 1rem; outline: none;">
+                    <option value="0">Post Immediately</option>
+                    <option value="1">Time Capsule: Unlock in 1 Hour</option>
+                    <option value="12">Time Capsule: Unlock in 12 Hours</option>
+                    <option value="24">Time Capsule: Unlock in 24 Hours</option>
                 </select>
                 <textarea id="post-caption" placeholder="Write a caption..."></textarea>
                 <button class="btn-primary full-width" id="submit-post-btn">Share Post</button>

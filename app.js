@@ -110,6 +110,7 @@ async function initApp() {
         document.getElementById('nav-avatar').innerHTML = getAvatarHtml(currentUser.avatar);
 
         initSocket();
+        loadPrompt();
         loadFeed();
         loadSuggestions();
         loadNotifications();
@@ -178,6 +179,9 @@ imageInput.addEventListener('change', (e) => {
 document.getElementById('submit-post-btn').addEventListener('click', async () => {
     const caption = document.getElementById('post-caption').value;
     const postType = document.getElementById('post-type-select').value;
+    const isPromptResponse = document.getElementById('post-is-prompt').checked;
+    const unlockHours = document.getElementById('post-unlock-select').value;
+    
     if (!caption && !selectedImageBase64) return showToast('Please add an image or caption');
 
     document.getElementById('submit-post-btn').innerText = 'Posting...';
@@ -189,7 +193,7 @@ document.getElementById('submit-post-btn').addEventListener('click', async () =>
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}`
             },
-            body: JSON.stringify({ caption, image: selectedImageBase64, postType })
+            body: JSON.stringify({ caption, image: selectedImageBase64, postType, isPromptResponse, unlockHours })
         });
         
         if (res.ok) {
@@ -209,10 +213,21 @@ function resetPostModal() {
     imagePreview.classList.add('hidden');
     document.getElementById('post-caption').value = '';
     document.getElementById('post-type-select').value = 'post';
+    document.getElementById('post-is-prompt').checked = false;
+    document.getElementById('post-unlock-select').value = '0';
     imageInput.value = '';
 }
 
 // Feed Generation
+async function loadPrompt() {
+    try {
+        const res = await fetch(API_URL + '/api/prompt', { headers: { 'Authorization': `Bearer ${localStorage.getItem('snappic_token')}` } });
+        const data = await res.json();
+        document.getElementById('daily-prompt-text').innerText = data.prompt;
+        document.getElementById('daily-prompt-banner').classList.remove('hidden');
+    } catch (e) {}
+}
+
 async function loadFeed() {
     const token = localStorage.getItem('snappic_token');
     try {
@@ -222,6 +237,27 @@ async function loadFeed() {
         const container = document.getElementById('feed-container');
         container.innerHTML = '';
         
+        const promptContainer = document.getElementById('prompt-responses-container');
+        if (promptContainer) {
+            promptContainer.innerHTML = '';
+            const promptPosts = data.posts.filter(p => p.isPromptResponse);
+            if (promptPosts.length > 0) {
+                promptContainer.classList.remove('hidden');
+                promptPosts.forEach(p => {
+                    const b = document.createElement('div');
+                    b.style = "min-width: 65px; height: 65px; border-radius: 50%; border: 3px solid var(--primary); padding: 3px; cursor: pointer; flex-shrink: 0;";
+                    b.innerHTML = `<div class="avatar" style="width:100%; height:100%; border-radius:50%; overflow:hidden;">${getAvatarHtml(p.author.avatar)}</div>`;
+                    b.onclick = () => {
+                        const postEl = document.getElementById(`post-${p.id}`);
+                        if(postEl) postEl.scrollIntoView({behavior: 'smooth'});
+                    };
+                    promptContainer.appendChild(b);
+                });
+            } else {
+                promptContainer.classList.add('hidden');
+            }
+        }
+
         if (!data.posts || data.posts.length === 0) {
             container.innerHTML = '<div style="text-align:center; padding: 3rem; color: var(--text-muted);">No posts yet. Follow people to see their posts!</div>';
             return;
@@ -236,6 +272,8 @@ async function loadFeed() {
 }
 
 function createPostElement(post) {
+    const isLocked = post.unlockDate && new Date(post.unlockDate) > new Date();
+    
     const div = document.createElement('div');
     div.className = 'post-card';
     div.id = `post-${post.id}`;
@@ -245,6 +283,46 @@ function createPostElement(post) {
         post.comments.forEach(c => {
             commentsHtml += `<div class="comment"><strong>${escapeHtml(c.username)}</strong> ${escapeHtml(c.text)}</div>`;
         });
+    }
+
+    let innerContent = '';
+    if (isLocked) {
+        innerContent = `
+            <div class="time-capsule-container">
+                <i class="ri-lock-fill" style="font-size:3rem; color:var(--accent); margin-bottom:10px; display:inline-block;"></i>
+                <h4>Time Capsule</h4>
+                <p>Unlocks in: <span class="countdown-timer" data-unlock="${post.unlockDate}" style="font-weight:bold; color:var(--accent);">Loading...</span></p>
+            </div>
+        `;
+    } else {
+        innerContent = `
+            ${post.image ? `<img src="${post.image}" class="post-image" loading="lazy" onclick="openImageViewer('${post.image}')" style="cursor: zoom-in;">` : ''}
+            <div class="post-caption">
+                <strong>${escapeHtml(post.author.username)}</strong> ${escapeHtml(post.caption)}
+                ${post.isPromptResponse ? '<span style="display:inline-block; background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-left:10px;"><i class="ri-fire-fill"></i> Daily Prompt</span>' : ''}
+            </div>
+            <div class="post-actions">
+                <button class="action-btn ${post.isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+                    <i class="${post.isLiked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}"></i>
+                    <span id="like-count-${post.id}">${post.likes}</span>
+                </button>
+                <button class="action-btn" onclick="document.getElementById('comment-input-${post.id}').focus()">
+                    <i class="ri-chat-3-line"></i>
+                    <span id="comment-count-${post.id}">${post.commentCount}</span>
+                </button>
+                <button class="action-btn" onclick="copyLink('${post.id}')">
+                    <i class="ri-share-forward-line"></i>
+                </button>
+            </div>
+            <button onclick="toggleComments('${post.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem; margin-bottom:10px; font-weight:500;">Toggle Comments</button>
+            <div class="post-comments" id="comments-${post.id}">
+                ${commentsHtml}
+            </div>
+            <div class="comment-input-area">
+                <input type="text" id="comment-input-${post.id}" placeholder="Add a comment..." onkeypress="if(event.key === 'Enter') addComment('${post.id}')">
+                <button onclick="addComment('${post.id}')">Post</button>
+            </div>
+        `;
     }
 
     div.innerHTML = `
@@ -260,31 +338,7 @@ function createPostElement(post) {
                 <i class="${post.author.id === currentUser.id ? 'ri-delete-bin-line' : 'ri-more-2-fill'}" ${post.author.id === currentUser.id ? 'style="color: #ef4444;"' : ''}></i>
             </button>
         </div>
-        ${post.image ? `<img src="${post.image}" class="post-image" loading="lazy" onclick="openImageViewer('${post.image}')" style="cursor: zoom-in;">` : ''}
-        <div class="post-caption">
-            <strong>${escapeHtml(post.author.username)}</strong> ${escapeHtml(post.caption)}
-        </div>
-        <div class="post-actions">
-            <button class="action-btn ${post.isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
-                <i class="${post.isLiked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}"></i>
-                <span id="like-count-${post.id}">${post.likes}</span>
-            </button>
-            <button class="action-btn" onclick="document.getElementById('comment-input-${post.id}').focus()">
-                <i class="ri-chat-3-line"></i>
-                <span id="comment-count-${post.id}">${post.commentCount}</span>
-            </button>
-            <button class="action-btn" onclick="copyLink('${post.id}')">
-                <i class="ri-share-forward-line"></i>
-            </button>
-        </div>
-        <button onclick="toggleComments('${post.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem; margin-bottom:10px; font-weight:500;">Toggle Comments</button>
-        <div class="post-comments" id="comments-${post.id}">
-            ${commentsHtml}
-        </div>
-        <div class="comment-input-area">
-            <input type="text" id="comment-input-${post.id}" placeholder="Add a comment..." onkeypress="if(event.key === 'Enter') addComment('${post.id}')">
-            <button onclick="addComment('${post.id}')">Post</button>
-        </div>
+        ${innerContent}
     `;
     return div;
 }
@@ -777,6 +831,19 @@ function initSocket() {
     socket.on('message_edited', (msg) => {
         appendMessage(msg);
     });
+
+    socket.on('room_history', (msgs) => {
+        document.getElementById('room-messages-container').innerHTML = '';
+        msgs.forEach(m => appendRoomMessage(m));
+        scrollRoomToBottom();
+    });
+
+    socket.on('new_room_message', ({ roomId, msg }) => {
+        if (currentRoomId === roomId) {
+            appendRoomMessage(msg);
+            scrollRoomToBottom();
+        }
+    });
 }
 
 document.getElementById('mobile-chat-btn').addEventListener('click', () => {
@@ -897,6 +964,70 @@ document.querySelectorAll('.profile-tab').forEach(tab => {
         }
     });
 });
+
+// Global Countdown Timer
+setInterval(() => {
+    document.querySelectorAll('.countdown-timer').forEach(el => {
+        const unlockDate = new Date(el.getAttribute('data-unlock'));
+        const now = new Date();
+        const diff = Math.floor((unlockDate - now) / 1000);
+        if (diff <= 0) {
+            el.innerText = 'Unlocked! Refresh feed.';
+        } else {
+            const h = Math.floor(diff / 3600);
+            const m = Math.floor((diff % 3600) / 60);
+            const s = diff % 60;
+            el.innerText = `${h}h ${m}m ${s}s`;
+        }
+    });
+}, 1000);
+
+// Campus Rooms Logic
+let currentRoomId = null;
+
+window.joinRoom = (roomId, element) => {
+    currentRoomId = roomId;
+    const names = { 'library': 'Library Grind', 'chill': 'Late Night Chill', 'confessions': 'Confessions (Anon)' };
+    document.getElementById('room-active-name').innerText = names[roomId];
+    document.getElementById('room-messages-container').innerHTML = '';
+    document.getElementById('room-active-state').style.opacity = '1';
+    
+    document.querySelectorAll('#rooms-list .convo-item').forEach(el => el.classList.remove('active'));
+    if(element) element.classList.add('active');
+    
+    socket.emit('join_room', roomId);
+    if (window.innerWidth <= 768) {
+        document.getElementById('room-chat-area').classList.add('active');
+    }
+};
+
+function appendRoomMessage(msg) {
+    const container = document.getElementById('room-messages-container');
+    if (!container) return;
+    const isMe = msg.senderId === currentUser.id;
+    const div = document.createElement('div');
+    div.className = `msg ${isMe ? 'sent' : 'received'}`;
+    div.innerHTML = `<div style="font-size:0.75rem; opacity:0.7; margin-bottom:4px; font-weight:600;">${escapeHtml(msg.senderName)}</div><span>${escapeHtml(msg.text)}</span>`;
+    container.appendChild(div);
+}
+
+function scrollRoomToBottom() {
+    const container = document.getElementById('room-messages-container');
+    if (container) container.scrollTop = container.scrollHeight;
+}
+
+document.getElementById('send-room-msg-btn')?.addEventListener('click', sendRoomMessage);
+document.getElementById('room-message-input')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendRoomMessage();
+});
+
+function sendRoomMessage() {
+    const input = document.getElementById('room-message-input');
+    const text = input.value.trim();
+    if (!text || !currentRoomId) return;
+    socket.emit('room_message', { roomId: currentRoomId, text });
+    input.value = '';
+}
 
 // Run Init
 initApp();

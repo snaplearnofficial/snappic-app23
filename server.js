@@ -83,6 +83,8 @@ const postSchema = new mongoose.Schema({
   postType: { type: String, default: 'post' }, // 'post' or 'note'
   likes: { type: [String], default: [] },
   comments: { type: Array, default: [] },
+  isPromptResponse: { type: Boolean, default: false },
+  unlockDate: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }
 });
 const Post = mongoose.model('Post', postSchema);
@@ -274,6 +276,11 @@ app.post('/api/users/:id/follow', auth, async (req, res) => {
 });
 
 // ─── POST ROUTES ──────────────────────────────────────
+const currentPrompt = "What's the weirdest thing on your desk right now?";
+app.get('/api/prompt', auth, (req, res) => {
+    res.json({ prompt: currentPrompt });
+});
+
 app.get('/api/posts', auth, async (req, res) => {
   try {
     const posts = await Post.find().sort({ createdAt: -1 }).limit(50);
@@ -285,6 +292,8 @@ app.get('/api/posts', auth, async (req, res) => {
         caption: p.caption, 
         image: p.image, 
         postType: p.postType || 'post',
+        isPromptResponse: p.isPromptResponse,
+        unlockDate: p.unlockDate,
         likes: p.likes.length,
         isLiked: p.likes.includes(req.user.id),
         comments: p.comments.slice(-5),
@@ -298,8 +307,12 @@ app.get('/api/posts', auth, async (req, res) => {
 
 app.post('/api/posts', auth, async (req, res) => {
   try {
-    const { caption, image, postType } = req.body;
-    const post = new Post({ id: generateId(), authorId: req.user.id, caption, image: image || null, postType: postType || 'post' });
+    const { caption, image, postType, isPromptResponse, unlockHours } = req.body;
+    let unlockDate = null;
+    if (unlockHours && parseInt(unlockHours) > 0) {
+        unlockDate = new Date(Date.now() + parseInt(unlockHours) * 3600 * 1000);
+    }
+    const post = new Post({ id: generateId(), authorId: req.user.id, caption, image: image || null, postType: postType || 'post', isPromptResponse: isPromptResponse || false, unlockDate });
     await post.save();
     
     const author = await User.findOne({ id: req.user.id });
@@ -309,6 +322,8 @@ app.post('/api/posts', auth, async (req, res) => {
       caption: post.caption, 
       image: post.image, 
       postType: post.postType,
+      isPromptResponse: post.isPromptResponse,
+      unlockDate: post.unlockDate,
       likes: 0, 
       isLiked: false, 
       comments: [], 
@@ -466,6 +481,35 @@ io.on('connection', (socket) => {
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('message_edited', msg);
     }
+  });
+
+  const roomMessages = { 'library': [], 'chill': [], 'confessions': [] };
+
+  socket.on('join_room', (roomId) => {
+      ['library', 'chill', 'confessions'].forEach(r => socket.leave(r));
+      socket.join(roomId);
+      socket.emit('room_history', roomMessages[roomId] || []);
+  });
+
+  socket.on('room_message', async ({ roomId, text }) => {
+      const senderId = socketToUser[socket.id];
+      if (!senderId || !roomId || !text) return;
+      const sender = await User.findOne({ id: senderId });
+      
+      const msg = {
+          id: generateId(),
+          senderId,
+          senderName: roomId === 'confessions' ? 'Anonymous' : sender.username,
+          senderAvatar: roomId === 'confessions' ? '?' : sender.avatar,
+          text,
+          createdAt: new Date().toISOString()
+      };
+      
+      if (!roomMessages[roomId]) roomMessages[roomId] = [];
+      roomMessages[roomId].push(msg);
+      if (roomMessages[roomId].length > 50) roomMessages[roomId].shift();
+      
+      io.to(roomId).emit('new_room_message', { roomId, msg });
   });
 
   socket.on('disconnect', () => {
