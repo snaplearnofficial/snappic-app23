@@ -1,14 +1,14 @@
 :root {
-    --bg-main: #e8eee9;
+    --bg-main: #fdfafb;
     --bg-card: #ffffff;
-    --primary: #0b5c47;
-    --primary-light: #d4e8d8;
-    --accent: #86d293;
+    --primary: #ff7c88;
+    --primary-light: #ffe4e6;
+    --accent: #fb7185;
     --text-main: #1e293b;
-    --text-muted: #64748b;
-    --border: #e2e8f0;
-    --radius-lg: 24px;
-    --radius-md: 16px;
+    --text-muted: #94a3b8;
+    --border: #f1f5f9;
+    --radius-lg: 28px;
+    --radius-md: 18px;
     --radius-sm: 12px;
 }
 
