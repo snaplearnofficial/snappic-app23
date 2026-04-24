@@ -440,6 +440,32 @@ io.on('connection', (socket) => {
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('new_direct_message', msg);
     }
+    
+    const sender = await User.findOne({ id: senderId });
+    if (sender && senderId !== receiverId) {
+        const notif = new Notification({
+            id: generateId(), userId: receiverId, type: 'message', senderId, senderUsername: sender.username, senderAvatar: sender.avatar, postId: null
+        });
+        await notif.save();
+        if (receiverSocketId) io.to(receiverSocketId).emit('new_notification', notif);
+    }
+  });
+
+  socket.on('edit_direct_message', async ({ messageId, newText }) => {
+    const senderId = socketToUser[socket.id];
+    if (!senderId || !messageId || !newText) return;
+
+    const msg = await Message.findOne({ id: messageId });
+    if (!msg || msg.senderId !== senderId) return;
+
+    msg.text = newText;
+    await msg.save();
+
+    socket.emit('message_edited', msg);
+    const receiverSocketId = userToSocket[msg.receiverId];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('message_edited', msg);
+    }
   });
 
   socket.on('disconnect', () => {

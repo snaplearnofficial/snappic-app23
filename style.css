@@ -424,6 +424,8 @@ h1, h2, h3, h4, .logo {
 .msg { max-width: 70%; padding: 12px 18px; border-radius: 20px; font-size: 0.95rem; line-height: 1.4; }
 .msg.sent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 5px; }
 .msg.received { align-self: flex-start; background: white; color: var(--text-main); border-bottom-left-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.edit-msg-btn { background: none; border: none; color: inherit; opacity: 0.7; cursor: pointer; margin-left: 10px; font-size: 0.9rem; }
+.edit-msg-btn:hover { opacity: 1; }
 .chat-input-area { background: var(--bg-card); padding: 15px 20px; display: flex; gap: 10px; border-top: 1px solid var(--border); }
 #message-input { flex: 1; border: none; background: var(--bg-main); padding: 12px 20px; border-radius: 25px; outline: none; }
 #send-msg-btn { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }

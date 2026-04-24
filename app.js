@@ -277,6 +277,7 @@ function createPostElement(post) {
                 <i class="ri-share-forward-line"></i>
             </button>
         </div>
+        <button onclick="toggleComments('${post.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem; margin-bottom:10px; font-weight:500;">Toggle Comments</button>
         <div class="post-comments" id="comments-${post.id}">
             ${commentsHtml}
         </div>
@@ -346,6 +347,13 @@ window.addComment = async (postId) => {
 window.copyLink = (postId) => {
     navigator.clipboard.writeText(window.location.origin + '?post=' + postId);
     showToast('Link copied to clipboard!');
+};
+
+window.toggleComments = (postId) => {
+    const commentsDiv = document.getElementById(`comments-${postId}`);
+    const inputArea = document.querySelector(`#post-${postId} .comment-input-area`);
+    if (commentsDiv) commentsDiv.classList.toggle('hidden');
+    if (inputArea) inputArea.classList.toggle('hidden');
 };
 
 // Explore / Search
@@ -581,11 +589,28 @@ function sendMessage() {
 
 function appendMessage(msg) {
     const container = document.getElementById('messages-container');
-    const div = document.createElement('div');
     const isMe = msg.senderId === currentUser.id;
+    
+    let div = document.getElementById(`msg-${msg.id}`);
+    if (!div) {
+        div = document.createElement('div');
+        div.id = `msg-${msg.id}`;
+        container.appendChild(div);
+    }
+    
     div.className = `msg ${isMe ? 'sent' : 'received'}`;
-    div.innerText = msg.text;
-    container.appendChild(div);
+    let html = `<span>${escapeHtml(msg.text)}</span>`;
+    if (isMe) {
+        html += ` <button onclick="editMessage('${msg.id}', '${escapeHtml(msg.text).replace(/'/g, "\\'")}')" class="edit-msg-btn"><i class="ri-edit-line"></i></button>`;
+    }
+    div.innerHTML = html;
+}
+
+window.editMessage = (messageId, oldText) => {
+    const newText = prompt("Edit message:", oldText);
+    if (newText !== null && newText.trim() !== "") {
+        socket.emit('edit_direct_message', { messageId, newText: newText.trim() });
+    }
 }
 
 function scrollToBottom() {
@@ -642,6 +667,7 @@ async function loadNotifications() {
             if (n.type === 'like') text = 'liked your post.';
             if (n.type === 'comment') text = 'commented on your post.';
             if (n.type === 'follow') text = 'started following you.';
+            if (n.type === 'message') text = 'sent you a message.';
             
             div.innerHTML = `
                 <div class="avatar">${getAvatarHtml(n.senderAvatar)}</div>
@@ -653,6 +679,7 @@ async function loadNotifications() {
             `;
             div.onclick = () => {
                 if(n.type === 'follow') loadProfile(n.senderId);
+                if(n.type === 'message') openChat(n.senderId, n.senderUsername, n.senderAvatar);
                 // Can add post viewing for like/comment later
             };
             list.appendChild(div);
@@ -745,6 +772,10 @@ function initSocket() {
         unreadNotifications++;
         updateBadge();
         loadNotifications();
+    });
+    
+    socket.on('message_edited', (msg) => {
+        appendMessage(msg);
     });
 }
 
