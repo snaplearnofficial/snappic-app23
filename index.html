@@ -220,27 +220,55 @@
 
     <!-- Auth Container -->
     <div id="auth" class="auth-container">
-        <div class="auth-card">
-            <div class="auth-logo"><i class="ri-leaf-fill"></i> Snappic</div>
-            <h1 id="auth-title">Welcome back</h1>
-            <p class="auth-subtitle">Log in to see photos and videos from your friends.</p>
-            
-            <form id="auth-form">
-                <div class="input-group hidden" id="username-group">
-                    <input type="text" id="auth-username" placeholder="Username">
+        <!-- Topo Background pattern -->
+        <div class="auth-bg-pattern"></div>
+        
+        <div class="auth-content-wrapper">
+            <div class="auth-wave">
+                <svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="#ffffff" fill-opacity="1" d="M0,192L48,208C96,224,192,256,288,245.3C384,235,480,181,576,170.7C672,160,768,192,864,192C960,192,1056,160,1152,138.7C1248,117,1344,107,1392,101.3L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>
+            </div>
+            <div class="auth-card">
+                <h1 id="auth-title">Sign in</h1>
+                
+                <form id="auth-form">
+                    <div class="input-group hidden" id="username-group">
+                        <label>Username</label>
+                        <div class="input-field-wrapper">
+                            <i class="ri-user-line"></i>
+                            <input type="text" id="auth-username" placeholder="enter your username">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Email</label>
+                        <div class="input-field-wrapper">
+                            <i class="ri-mail-line"></i>
+                            <input type="email" id="auth-email" placeholder="demo@email.com" required>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <div class="input-field-wrapper">
+                            <i class="ri-lock-line" style="color: #cbd5e1;"></i>
+                            <input type="password" id="auth-password" placeholder="enter your password" required>
+                            <i class="ri-eye-off-line toggle-password" style="cursor:pointer; margin-left:auto; color:var(--text-muted);"></i>
+                        </div>
+                    </div>
+
+                    <div class="auth-options">
+                        <label class="remember-me">
+                            <input type="checkbox" checked>
+                            Remember Me
+                        </label>
+                        <a href="#" class="forgot-pass">Forgot Password?</a>
+                    </div>
+
+                    <button type="submit" id="auth-submit">Login</button>
+                </form>
+                
+                <div class="auth-switch">
+                    <span id="auth-switch-text">Don't have an Account ?</span>
+                    <button id="auth-switch-btn">Sign up</button>
                 </div>
-                <div class="input-group">
-                    <input type="email" id="auth-email" placeholder="Email" required>
-                </div>
-                <div class="input-group">
-                    <input type="password" id="auth-password" placeholder="Password" required>
-                </div>
-                <button type="submit" class="btn-primary" id="auth-submit">Log In</button>
-            </form>
-            
-            <div class="auth-switch">
-                <span id="auth-switch-text">Don't have an account?</span>
-                <button id="auth-switch-btn">Sign up</button>
             </div>
         </div>
     </div>
