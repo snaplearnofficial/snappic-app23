@@ -49,11 +49,22 @@ const appContainer = document.getElementById('app');
 
 document.getElementById('auth-switch-btn').addEventListener('click', () => {
     isLoginMode = !isLoginMode;
-    document.getElementById('auth-title').innerText = isLoginMode ? 'Welcome back' : 'Create an account';
+    document.getElementById('auth-title').innerText = isLoginMode ? 'Sign in' : 'Welcome';
     document.getElementById('username-group').classList.toggle('hidden', isLoginMode);
-    document.getElementById('auth-submit').innerText = isLoginMode ? 'Log In' : 'Sign Up';
-    document.getElementById('auth-switch-text').innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
-    document.getElementById('auth-switch-btn').innerText = isLoginMode ? 'Sign up' : 'Log in';
+    document.getElementById('auth-submit').innerText = isLoginMode ? 'Login' : 'Continue';
+    document.getElementById('auth-switch-text').innerText = isLoginMode ? "Don't have an Account ?" : "Already have an Account ?";
+    document.getElementById('auth-switch-btn').innerText = isLoginMode ? 'Sign up' : 'Sign in';
+});
+
+document.querySelector('.toggle-password')?.addEventListener('click', function() {
+    const passInput = document.getElementById('auth-password');
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        this.classList.replace('ri-eye-off-line', 'ri-eye-line');
+    } else {
+        passInput.type = 'password';
+        this.classList.replace('ri-eye-line', 'ri-eye-off-line');
+    }
 });
 
 document.getElementById('auth-form').addEventListener('submit', async (e) => {

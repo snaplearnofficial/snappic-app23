@@ -219,55 +219,62 @@
     </div>
 
     <!-- Auth Container -->
-    <div id="auth" class="auth-container">
-        <!-- Topo Background pattern -->
-        <div class="auth-bg-pattern"></div>
+    <div id="auth" class="auth-container" style="position: fixed; inset: 0; background-color: #ff7c88; z-index: 2000; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;">
         
-        <div class="auth-content-wrapper">
-            <div class="auth-wave">
-                <svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="#ffffff" fill-opacity="1" d="M0,192L48,208C96,224,192,256,288,245.3C384,235,480,181,576,170.7C672,160,768,192,864,192C960,192,1056,160,1152,138.7C1248,117,1344,107,1392,101.3L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>
-            </div>
-            <div class="auth-card">
-                <h1 id="auth-title">Sign in</h1>
-                
-                <form id="auth-form">
-                    <div class="input-group hidden" id="username-group">
-                        <label>Username</label>
-                        <div class="input-field-wrapper">
-                            <i class="ri-user-line"></i>
-                            <input type="text" id="auth-username" placeholder="enter your username">
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Email</label>
-                        <div class="input-field-wrapper">
-                            <i class="ri-mail-line"></i>
-                            <input type="email" id="auth-email" placeholder="demo@email.com" required>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Password</label>
-                        <div class="input-field-wrapper">
-                            <i class="ri-lock-line" style="color: #cbd5e1;"></i>
-                            <input type="password" id="auth-password" placeholder="enter your password" required>
-                            <i class="ri-eye-off-line toggle-password" style="cursor:pointer; margin-left:auto; color:var(--text-muted);"></i>
-                        </div>
-                    </div>
+        <!-- Topo Background pattern -->
+        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.15) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(255,255,255,0.15) 0%, transparent 40%), repeating-radial-gradient(circle at 50% 30%, transparent 0, transparent 20px, rgba(255,255,255,0.08) 21px, rgba(255,255,255,0.08) 22px); pointer-events: none; z-index: 1;"></div>
+        
+        <!-- Empty Top Space for Pink Background -->
+        <div style="flex: 1; min-height: 25vh; z-index: 2;"></div>
 
-                    <div class="auth-options">
-                        <label class="remember-me">
-                            <input type="checkbox" checked>
-                            Remember Me
-                        </label>
-                        <a href="#" class="forgot-pass">Forgot Password?</a>
-                    </div>
+        <!-- The Wave and Form -->
+        <div style="position: relative; z-index: 3; background: transparent; display: flex; flex-direction: column; flex: 2; width: 100%;">
+            <svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width: 100%; height: 12vh; display: block; margin-bottom: -1px;">
+                <path fill="#ffffff" d="M0,5 C40,20 60,0 100,10 L100,20 L0,20 Z"></path>
+            </svg>
+            <div style="background: #ffffff; flex: 1; padding: 20px 30px 60px 30px; display: flex; flex-direction: column; align-items: center;">
+                <div style="width: 100%; max-width: 420px; text-align: left;">
+                    <h1 id="auth-title" style="font-size: 2.5rem; color: #1e293b; margin-bottom: 30px; font-family: 'Outfit', sans-serif; font-weight: 700;">Sign in</h1>
+                    
+                    <form id="auth-form">
+                        <div class="hidden" id="username-group" style="margin-bottom: 25px;">
+                            <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 8px; font-weight: 500;">Username</label>
+                            <div class="auth-input-wrapper">
+                                <i class="ri-user-line" style="color: #cbd5e1; font-size: 1.2rem; margin-right: 10px;"></i>
+                                <input type="text" id="auth-username" placeholder="enter your username" style="flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 0.95rem; color: #1e293b; padding: 0;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 25px;">
+                            <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 8px; font-weight: 500;">Email</label>
+                            <div class="auth-input-wrapper">
+                                <i class="ri-mail-line" style="color: #cbd5e1; font-size: 1.2rem; margin-right: 10px;"></i>
+                                <input type="email" id="auth-email" placeholder="demo@email.com" required style="flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 0.95rem; color: #1e293b; padding: 0;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 25px;">
+                            <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 8px; font-weight: 500;">Password</label>
+                            <div class="auth-input-wrapper">
+                                <i class="ri-lock-line" style="color: #cbd5e1; font-size: 1.2rem; margin-right: 10px;"></i>
+                                <input type="password" id="auth-password" placeholder="enter your password" required style="flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 0.95rem; color: #1e293b; padding: 0;">
+                                <i class="ri-eye-off-line toggle-password" style="cursor:pointer; margin-left:auto; color:#94a3b8; font-size:1.1rem;"></i>
+                            </div>
+                        </div>
 
-                    <button type="submit" id="auth-submit">Login</button>
-                </form>
-                
-                <div class="auth-switch">
-                    <span id="auth-switch-text">Don't have an Account ?</span>
-                    <button id="auth-switch-btn">Sign up</button>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; font-size: 0.85rem;">
+                            <label style="display: flex; align-items: center; color: #64748b; cursor: pointer; font-weight: 500;">
+                                <input type="checkbox" checked style="margin-right: 8px; accent-color: #ff7c88; width: 16px; height: 16px;">
+                                Remember Me
+                            </label>
+                            <a href="#" style="color: #ff7c88; text-decoration: none; font-weight: 600;">Forgot Password?</a>
+                        </div>
+
+                        <button type="submit" id="auth-submit" style="width: 100%; background-color: #ff7c88; color: white; padding: 15px; font-size: 1.1rem; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px rgba(255, 124, 136, 0.4); transition: transform 0.2s;">Login</button>
+                    </form>
+                    
+                    <div style="margin-top: 30px; text-align: center; font-size: 0.95rem; color: #94a3b8; font-weight: 500;">
+                        <span id="auth-switch-text">Don't have an Account ?</span>
+                        <button id="auth-switch-btn" style="background: none; border: none; color: #ff7c88; font-weight: 700; cursor: pointer; margin-left: 5px; font-size: 0.95rem;">Sign up</button>
+                    </div>
                 </div>
             </div>
         </div>
