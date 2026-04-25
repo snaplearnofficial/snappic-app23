@@ -3,338 +3,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snappic - Connect & Share</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>Snappic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- App Container -->
-    <div id="app" class="hidden">
-        <!-- Navigation -->
-        <nav class="sidebar">
-            <div class="logo">
-                <i class="ri-leaf-fill"></i> Snappic
-            </div>
-            <div class="nav-items">
-                <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i> <span>Home</span></a>
-                <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i> <span>Explore</span></a>
-                <a href="#" class="nav-item" data-target="chat-view"><i class="ri-message-3-line"></i> <span>Messages</span><span class="badge" id="msg-badge" style="display:none">0</span></a>
-                <a href="#" class="nav-item" data-target="rooms-view"><i class="ri-live-line"></i> <span>Campus Rooms</span></a>
-                <a href="#" class="nav-item" data-target="notifications-view" id="nav-notifications"><i class="ri-heart-3-line"></i> <span>Notifications</span><span class="badge" id="notif-badge" style="display:none">0</span></a>
-                <a href="#" class="nav-item" id="nav-profile" data-target="profile-view"><i class="ri-user-line"></i> <span>Profile</span></a>
-            </div>
-            <button class="create-btn" id="open-post-modal"><i class="ri-add-line"></i> <span>Create</span></button>
-            
-            <div class="user-mini">
-                <div class="avatar" id="nav-avatar"></div>
-                <div class="info">
-                    <div class="name" id="nav-username">User</div>
-                    <div class="status">Online <span id="online-count-badge">1</span></div>
-                </div>
-                <button id="logout-btn"><i class="ri-logout-circle-r-line"></i></button>
-            </div>
-        </nav>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <!-- Feed View -->
-            <section id="feed-view" class="view-section active">
-                <header class="mobile-header">
-                    <div class="logo"><i class="ri-leaf-fill"></i> Snappic</div>
-                    <button id="mobile-chat-btn"><i class="ri-message-3-line"></i></button>
-                </header>
+<!-- ═══ APP (shown after login) ═══════════════════════════════════ -->
+<div id="app" class="hidden">
 
-                <div id="daily-prompt-banner" class="hidden" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 15px; border-radius: var(--radius-lg); margin-bottom: 20px; box-shadow: 0 10px 20px rgba(11,92,71,0.2);">
-                    <h3 style="margin-bottom: 5px; display: flex; align-items: center; gap: 8px;"><i class="ri-fire-fill"></i> Daily Prompt</h3>
-                    <p id="daily-prompt-text" style="font-size: 1.1rem; font-weight: 500;">Loading prompt...</p>
+    <!-- SIDEBAR (desktop) -->
+    <nav class="sidebar">
+        <div class="logo"><i class="ri-camera-fill"></i> Snappic</div>
+        <div class="nav-items">
+            <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-compass-3-fill"></i><span>Discover</span></a>
+            <a href="#" class="nav-item" data-target="explore-view"><i class="ri-search-2-line"></i><span>Explore</span></a>
+            <a href="#" class="nav-item" data-target="chat-view">
+                <i class="ri-chat-3-fill"></i><span>Messages</span>
+                <span class="badge" id="msg-badge" style="display:none">0</span>
+            </a>
+            <a href="#" class="nav-item" data-target="rooms-view"><i class="ri-live-fill"></i><span>Rooms</span></a>
+            <a href="#" class="nav-item" data-target="notif-view"><i class="ri-notification-3-fill"></i><span>Notifications</span><span class="badge" id="notif-badge" style="display:none">0</span></a>
+            <a href="#" class="nav-item" id="nav-profile" data-target="profile-view"><i class="ri-user-smile-fill"></i><span>Profile</span></a>
+        </div>
+        <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
+            <button class="create-btn" id="open-post-modal"><i class="ri-add-circle-fill"></i> New Post</button>
+            <div style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:10px;" onclick="document.getElementById('nav-profile').click()">
+                <div class="avatar" id="nav-avatar" style="width:40px;height:40px;"></div>
+                <div style="flex:1;overflow:hidden;">
+                    <div id="nav-username" style="font-weight:700;font-size:0.9rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">User</div>
+                    <div style="font-size:0.75rem;color:#10b981;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;background:#10b981;border-radius:50%;display:inline-block;"></span>Online</div>
                 </div>
-                <div id="prompt-responses-container" class="hidden" style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 10px; scrollbar-width: none;">
-                    <!-- Horizontal bubbles for prompt responses -->
+                <button id="logout-btn" style="background:none;border:none;color:var(--text-muted);cursor:pointer;"><i class="ri-logout-box-r-line"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- FEED VIEW -->
+        <section id="feed-view" class="view-section active">
+            <header class="mobile-header">
+                <div class="logo"><i class="ri-camera-fill"></i> Snappic</div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="showView('notif-view')" style="background:var(--primary-light);border:none;width:38px;height:38px;border-radius:50%;color:var(--primary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;">
+                        <i class="ri-notification-3-fill"></i>
+                        <span id="notif-dot" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:red;border-radius:50%;"></span>
+                    </button>
+                    <button onclick="showView('chat-view')" style="background:var(--primary-light);border:none;width:38px;height:38px;border-radius:50%;color:var(--primary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;">
+                        <i class="ri-chat-3-fill"></i>
+                        <span id="mobile-msg-dot" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:red;border-radius:50%;"></span>
+                    </button>
+                </div>
+            </header>
+            <div style="padding:20px;">
+                <div class="dashboard-header">
+                    <h2>Hi, <span id="header-username">there</span> 👋</h2>
+                    <p>See what's happening on Snappic</p>
                 </div>
                 <div class="feed-container" id="feed-container">
-                    <!-- Posts load here -->
-                    <div style="text-align:center; padding: 2rem;"><i class="ri-loader-4-line ri-spin" style="font-size:2rem; color: var(--primary);"></i></div>
-                </div>
-            </section>
-
-            <!-- Search/Explore View -->
-            <section id="search-view" class="view-section hidden">
-                <div class="search-header" style="margin-bottom: 2rem;">
-                    <div class="input-group">
-                        <input type="text" id="search-input" placeholder="Search users by name...">
-                    </div>
-                </div>
-                <div class="search-results" id="search-results"></div>
-            </section>
-
-            <!-- Chat/Messages View -->
-            <section id="chat-view" class="view-section hidden">
-                <div class="chat-layout">
-                    <div class="chat-sidebar">
-                        <h3>Messages</h3>
-                        <div class="conversations-list" id="conversations-list">
-                            <!-- Convos here -->
-                        </div>
-                    </div>
-                    <div class="chat-area" id="chat-area">
-                        <div class="chat-empty" id="chat-empty-state">
-                            <i class="ri-message-3-line"></i>
-                            <p>Select a conversation to start chatting</p>
-                        </div>
-                        <div class="chat-active hidden" id="chat-active-state">
-                            <div class="chat-header">
-                                <button class="back-btn" id="close-chat-mobile"><i class="ri-arrow-left-line"></i></button>
-                                <div class="chat-user-info">
-                                    <div class="avatar" id="chat-active-avatar"></div>
-                                    <h4 id="chat-active-name">User</h4>
-                                </div>
-                                <div class="chat-theme-selector" style="margin-left: auto;">
-                                    <select id="chat-theme-select" style="padding: 5px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.9rem; outline: none;">
-                                        <option value="default">Default</option>
-                                        <option value="whatsapp">Doodle</option>
-                                        <option value="dark">Dark Solid</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="messages-container" id="messages-container"></div>
-                            <div class="chat-input-area">
-                                <input type="text" id="message-input" placeholder="Type a message...">
-                                <button id="send-msg-btn"><i class="ri-send-plane-fill"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Live Rooms View -->
-            <section id="rooms-view" class="view-section hidden">
-                <div class="chat-layout">
-                    <div class="chat-sidebar">
-                        <h3>Campus Rooms <br><span style="font-size:0.8rem; color:var(--text-muted); font-weight:normal;">Live ephemeral chat</span></h3>
-                        <div class="conversations-list" id="rooms-list">
-                            <div class="convo-item active" onclick="joinRoom('library', this)">
-                                <div class="avatar" style="background:#e0f2fe; color:#0284c7"><i class="ri-book-open-line"></i></div>
-                                <div class="convo-name">Library Grind</div>
-                            </div>
-                            <div class="convo-item" onclick="joinRoom('chill', this)">
-                                <div class="avatar" style="background:#fef08a; color:#ca8a04"><i class="ri-cup-line"></i></div>
-                                <div class="convo-name">Late Night Chill</div>
-                            </div>
-                            <div class="convo-item" onclick="joinRoom('confessions', this)">
-                                <div class="avatar" style="background:#fce7f3; color:#db2777"><i class="ri-ghost-line"></i></div>
-                                <div class="convo-name">Confessions (Anon)</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="chat-area" id="room-chat-area">
-                        <div class="chat-active" id="room-active-state" style="opacity:0;">
-                            <div class="chat-header">
-                                <h4 id="room-active-name">Select a Room</h4>
-                            </div>
-                            <div class="messages-container" id="room-messages-container" style="background:var(--bg-main);"></div>
-                            <div class="chat-input-area">
-                                <input type="text" id="room-message-input" placeholder="Message the room...">
-                                <button id="send-room-msg-btn"><i class="ri-send-plane-fill"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Notifications View -->
-            <section id="notifications-view" class="view-section hidden">
-                <div class="notifications-header" style="margin-bottom: 2rem;">
-                    <h2><i class="ri-notification-3-line"></i> Notifications</h2>
-                </div>
-                <div class="notifications-list" id="notifications-list" style="display: flex; flex-direction: column; gap: 15px;">
-                    <!-- Notifications load here -->
-                    <div style="text-align:center; padding: 2rem; color: var(--text-muted);">No new notifications</div>
-                </div>
-            </section>
-
-            <!-- Profile View -->
-            <section id="profile-view" class="view-section hidden">
-                <div class="profile-header">
-                    <div class="profile-cover"></div>
-                    <div class="profile-info-container">
-                        <div class="avatar large" id="profile-avatar" style="cursor: pointer;" title="Click to change profile picture"></div>
-                        <input type="file" id="avatar-upload-input" accept="image/*" hidden>
-                        <div class="profile-details">
-                            <h2 id="profile-username">Username</h2>
-                            <p id="profile-bio" class="bio">Welcome to my Snappic profile!</p>
-                            <div class="stats">
-                                <div><strong id="profile-posts-count">0</strong> Posts</div>
-                                <div><strong id="profile-followers">0</strong> Followers</div>
-                                <div><strong id="profile-following">0</strong> Following</div>
-                            </div>
-                            <div class="profile-actions" id="profile-actions">
-                                <!-- Follow btn injected here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="profile-tabs" style="display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
-                    <button class="profile-tab active" data-type="post" style="flex: 1; padding: 1rem; background: none; border: none; color: var(--text-main); font-weight: bold; cursor: pointer; border-bottom: 2px solid var(--primary); transition: all 0.2s;">Photos</button>
-                    <button class="profile-tab" data-type="note" style="flex: 1; padding: 1rem; background: none; border: none; color: var(--text-muted); font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;">School Notes</button>
-                </div>
-                <div class="profile-grid" id="profile-grid-post">
-                    <!-- User posts -->
-                </div>
-                <div class="profile-grid hidden" id="profile-grid-note">
-                    <!-- User notes -->
-                </div>
-            </section>
-
-            <!-- Notifications View -->
-            <section class="view-section hidden" id="notifications-view" style="max-width: 600px; margin: 0 auto; width: 100%;">
-                <div class="header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
-                    <h2>Notifications</h2>
-                </div>
-                <div id="notifications-list" style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
-                    <!-- Notification items -->
-                </div>
-            </section>
-        </main>
-
-        <!-- Right Sidebar (Trends/Suggestions) -->
-        <aside class="right-sidebar">
-            <div class="suggestions-card">
-                <h3>Suggested for you</h3>
-                <div class="suggestions-list" id="suggestions-list">
-                    <!-- Suggestions -->
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">Find friends in Explore tab!</p>
+                    <div style="text-align:center;padding:3rem;"><i class="ri-loader-4-line ri-spin" style="font-size:2rem;color:var(--primary);"></i></div>
                 </div>
             </div>
-            <div class="footer-links">
-                &copy; 2024 Snappic. Built with <i class="ri-heart-fill"></i>
-            </div>
-        </aside>
+        </section>
 
-        <!-- Bottom Nav (Mobile) -->
-        <nav class="bottom-nav">
-            <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-home-5-line"></i></a>
-            <a href="#" class="nav-item" data-target="search-view"><i class="ri-search-line"></i></a>
-            <button class="nav-item create-btn-mobile" id="open-post-modal-mobile"><i class="ri-add-line"></i></button>
-            <a href="#" class="nav-item" data-target="rooms-view"><i class="ri-live-line"></i></a>
-            <a href="#" class="nav-item" data-target="chat-view" style="position:relative;">
-                <i class="ri-message-3-line"></i>
-                <div class="badge" id="mobile-msg-badge" style="display:none; position:absolute; top:10px; right:15px; background:red; color:white; border-radius:50%; width:8px; height:8px; font-size:0;"></div>
-            </a>
-            <a href="#" class="nav-item" data-target="notifications-view" style="position:relative;">
-                <i class="ri-heart-3-line"></i>
-                <div class="badge" id="mobile-notif-badge" style="display:none; position:absolute; top:10px; right:15px; background:var(--primary); color:white; border-radius:50%; width:8px; height:8px; font-size:0;"></div>
-            </a>
-            <a href="#" class="nav-item" id="nav-profile-mobile" data-target="profile-view"><i class="ri-user-line"></i></a>
-        </nav>
+        <!-- EXPLORE VIEW -->
+        <section id="explore-view" class="view-section hidden">
+            <div style="padding:20px;">
+                <h2 style="margin-bottom:15px;">Explore</h2>
+                <div class="search-bar-container">
+                    <i class="ri-search-line"></i>
+                    <input type="text" id="search-input" placeholder="Search people...">
+                </div>
+                <div id="search-results" style="margin-top:10px;">
+                    <div style="text-align:center;color:var(--text-muted);padding:40px 0;">Search for people to connect</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CHAT VIEW -->
+        <section id="chat-view" class="view-section hidden" style="padding:0;max-width:100%;">
+            <div class="chat-layout" style="height:calc(100vh - 0px);">
+                <div class="chat-sidebar">
+                    <div style="padding:20px 20px 10px;display:flex;align-items:center;justify-content:space-between;">
+                        <h3 style="font-size:1.2rem;font-weight:800;">Messages</h3>
+                        <button onclick="showUserSearch()" style="background:var(--primary-light);border:none;width:35px;height:35px;border-radius:50%;color:var(--primary);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;"><i class="ri-edit-line"></i></button>
+                    </div>
+                    <div style="padding:0 15px 10px;">
+                        <input type="text" id="chat-search-input" placeholder="Search messages..." style="width:100%;padding:10px 15px;border:1px solid var(--border);border-radius:25px;outline:none;font-size:0.9rem;background:var(--bg-main);">
+                    </div>
+                    <div class="conversations-list" id="conversations-list"></div>
+                </div>
+                <div class="chat-area" id="chat-area">
+                    <div class="chat-empty" id="chat-empty-state">
+                        <i class="ri-message-3-line" style="font-size:4rem;color:#cbd5e1;margin-bottom:10px;"></i>
+                        <p style="color:var(--text-muted);">Select a conversation</p>
+                        <button onclick="showUserSearch()" style="margin-top:15px;background:var(--primary);color:white;border:none;padding:12px 25px;border-radius:25px;font-weight:600;cursor:pointer;">Send a Message</button>
+                    </div>
+                    <div class="chat-active hidden" id="chat-active-state">
+                        <div class="chat-header" style="background:white;padding:15px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);">
+                            <button id="close-chat-mobile" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-main);display:none;"><i class="ri-arrow-left-line"></i></button>
+                            <div class="avatar" id="chat-active-avatar" style="width:42px;height:42px;"></div>
+                            <div style="flex:1;">
+                                <div style="font-weight:700;font-size:1rem;" id="chat-active-name">User</div>
+                                <div id="typing-indicator" style="font-size:0.8rem;color:var(--primary);display:none;">typing...</div>
+                            </div>
+                            <button onclick="viewChatUserProfile()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;"><i class="ri-user-line"></i></button>
+                        </div>
+                        <div class="messages-container" id="messages-container" style="background:var(--bg-main);display:flex;flex-direction:column;padding:20px;gap:8px;overflow-y:auto;flex:1;"></div>
+                        <div class="chat-input-area" style="background:white;padding:12px 15px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--border);">
+                            <button onclick="document.getElementById('chat-img-input').click()" style="background:none;border:none;color:var(--primary);font-size:1.4rem;cursor:pointer;"><i class="ri-image-line"></i></button>
+                            <input type="file" id="chat-img-input" accept="image/*" hidden>
+                            <input type="text" id="message-input" placeholder="Message..." style="flex:1;border:1px solid var(--border);background:var(--bg-main);padding:12px 18px;border-radius:25px;outline:none;font-size:0.95rem;">
+                            <button id="send-msg-btn" style="background:var(--primary);color:white;border:none;width:45px;height:45px;border-radius:50%;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;"><i class="ri-send-plane-fill"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ROOMS VIEW -->
+        <section id="rooms-view" class="view-section hidden" style="padding:0;max-width:100%;">
+            <div class="chat-layout" style="height:calc(100vh - 0px);">
+                <div class="chat-sidebar">
+                    <div style="padding:20px 20px 15px;"><h3 style="font-size:1.2rem;font-weight:800;">Live Rooms</h3></div>
+                    <div class="conversations-list" id="rooms-list">
+                        <div class="convo-item" onclick="joinRoom('general',this)" style="display:flex;align-items:center;gap:15px;padding:15px 20px;cursor:pointer;border-bottom:1px solid var(--border);">
+                            <div class="avatar" style="background:#e0f2fe;color:#0284c7;width:48px;height:48px;"><i class="ri-discuss-line"></i></div>
+                            <div><div style="font-weight:700;">General</div><div style="font-size:0.8rem;color:var(--text-muted);">Open chat</div></div>
+                        </div>
+                        <div class="convo-item" onclick="joinRoom('announcements',this)" style="display:flex;align-items:center;gap:15px;padding:15px 20px;cursor:pointer;border-bottom:1px solid var(--border);">
+                            <div class="avatar" style="background:#fef08a;color:#ca8a04;width:48px;height:48px;"><i class="ri-megaphone-fill"></i></div>
+                            <div><div style="font-weight:700;">Announcements</div><div style="font-size:0.8rem;color:var(--text-muted);">Updates</div></div>
+                        </div>
+                        <div class="convo-item" onclick="joinRoom('random',this)" style="display:flex;align-items:center;gap:15px;padding:15px 20px;cursor:pointer;border-bottom:1px solid var(--border);">
+                            <div class="avatar" style="background:#fce7f3;color:#db2777;width:48px;height:48px;"><i class="ri-dice-line"></i></div>
+                            <div><div style="font-weight:700;">Random</div><div style="font-size:0.8rem;color:var(--text-muted);">Fun chat</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-area" id="room-chat-area">
+                    <div id="room-active-state" style="display:flex;flex-direction:column;height:100%;opacity:0;transition:opacity 0.3s;">
+                        <div class="chat-header" style="background:white;padding:15px 20px;border-bottom:1px solid var(--border);">
+                            <h4 id="room-active-name" style="font-weight:700;font-size:1.1rem;">Select a room</h4>
+                        </div>
+                        <div class="messages-container" id="room-messages-container" style="background:var(--bg-main);display:flex;flex-direction:column;padding:20px;gap:8px;overflow-y:auto;flex:1;"></div>
+                        <div style="background:white;padding:12px 15px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--border);">
+                            <input type="text" id="room-message-input" placeholder="Say something..." style="flex:1;border:1px solid var(--border);background:var(--bg-main);padding:12px 18px;border-radius:25px;outline:none;font-size:0.95rem;">
+                            <button id="send-room-msg-btn" style="background:var(--primary);color:white;border:none;width:45px;height:45px;border-radius:50%;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;"><i class="ri-send-plane-fill"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NOTIFICATIONS VIEW -->
+        <section id="notif-view" class="view-section hidden">
+            <div style="padding:20px;">
+                <h2 style="margin-bottom:20px;">Notifications</h2>
+                <div id="notif-list"><div style="text-align:center;color:var(--text-muted);padding:40px 0;">No notifications yet</div></div>
+            </div>
+        </section>
+
+        <!-- PROFILE VIEW -->
+        <section id="profile-view" class="view-section hidden" style="padding:0;">
+            <div class="profile-header">
+                <div class="profile-cover"></div>
+                <div class="profile-info-container">
+                    <div class="avatar large" id="profile-avatar" style="cursor:pointer;"></div>
+                    <input type="file" id="avatar-upload-input" accept="image/*" hidden>
+                    <h2 id="profile-username" style="margin-top:12px;font-size:1.4rem;font-weight:800;"></h2>
+                    <p id="profile-bio" class="bio" style="margin-top:4px;"></p>
+                    <div class="stats" style="margin-top:15px;">
+                        <div><strong id="profile-posts-count">0</strong><span>Posts</span></div>
+                        <div><strong id="profile-followers">0</strong><span>Followers</span></div>
+                        <div><strong id="profile-following">0</strong><span>Following</span></div>
+                    </div>
+                    <div id="profile-actions" style="display:flex;gap:10px;margin-top:15px;"></div>
+                </div>
+            </div>
+            <div style="padding:15px 20px;">
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;" id="profile-grid-post"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- BOTTOM NAV (mobile) -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active" data-target="feed-view"><i class="ri-compass-3-fill"></i><span>Home</span></a>
+        <a href="#" class="nav-item" data-target="explore-view"><i class="ri-search-2-line"></i><span>Search</span></a>
+        <button class="create-btn-mobile" id="open-post-modal-mobile"><i class="ri-add-line"></i></button>
+        <a href="#" class="nav-item" data-target="chat-view" style="position:relative;">
+            <i class="ri-chat-3-fill"></i><span>Chat</span>
+            <div id="mobile-msg-badge" style="display:none;position:absolute;top:5px;right:10px;background:red;border-radius:50%;width:8px;height:8px;"></div>
+        </a>
+        <a href="#" class="nav-item" id="nav-profile-mobile" data-target="profile-view"><i class="ri-user-smile-fill"></i><span>Profile</span></a>
+    </nav>
+</div>
+
+<!-- ═══ AUTH ══════════════════════════════════════════════════════ -->
+<div id="auth" class="auth-container">
+    <div class="auth-header">
+        <div class="auth-logo-icon"><i class="ri-camera-fill"></i></div>
+        <h1 class="auth-title">Snappic</h1>
+        <p class="auth-subtitle">Share moments. Connect with people. Be yourself.</p>
     </div>
-
-    <!-- Auth Container -->
-    <div id="auth" class="auth-container" style="position: fixed; inset: 0; background-color: #ff7c88; z-index: 2000; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;">
-        
-        <!-- Topo Background pattern -->
-        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.15) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(255,255,255,0.15) 0%, transparent 40%), repeating-radial-gradient(circle at 50% 30%, transparent 0, transparent 20px, rgba(255,255,255,0.08) 21px, rgba(255,255,255,0.08) 22px); pointer-events: none; z-index: 1;"></div>
-        
-        <!-- Empty Top Space for Pink Background -->
-        <div style="flex: 1; min-height: 25vh; z-index: 2;"></div>
-
-        <!-- The Wave and Form -->
-        <div style="position: relative; z-index: 3; background: transparent; display: flex; flex-direction: column; flex: 2; width: 100%;">
-            <svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width: 100%; height: 12vh; display: block; margin-bottom: -1px;">
-                <path fill="#ffffff" d="M0,5 C40,20 60,0 100,10 L100,20 L0,20 Z"></path>
-            </svg>
-            <div style="background: #ffffff; flex: 1; padding: 20px 30px 60px 30px; display: flex; flex-direction: column; align-items: center;">
-                <div style="width: 100%; max-width: 420px; text-align: left;">
-                    <h1 id="auth-title" style="font-size: 2.5rem; color: #1e293b; margin-bottom: 30px; font-family: 'Outfit', sans-serif; font-weight: 700;">Sign in</h1>
-                    
-                    <form id="auth-form">
-                        <div class="hidden" id="username-group" style="margin-bottom: 25px;">
-                            <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 8px; font-weight: 500;">Username</label>
-                            <div class="auth-input-wrapper">
-                                <i class="ri-user-line" style="color: #cbd5e1; font-size: 1.2rem; margin-right: 10px;"></i>
-                                <input type="text" id="auth-username" placeholder="enter your username" style="flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 0.95rem; color: #1e293b; padding: 0;">
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 25px;">
-                            <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 8px; font-weight: 500;">Email</label>
-                            <div class="auth-input-wrapper">
-                                <i class="ri-mail-line" style="color: #cbd5e1; font-size: 1.2rem; margin-right: 10px;"></i>
-                                <input type="email" id="auth-email" placeholder="demo@email.com" required style="flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 0.95rem; color: #1e293b; padding: 0;">
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 25px;">
-                            <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 8px; font-weight: 500;">Password</label>
-                            <div class="auth-input-wrapper">
-                                <i class="ri-lock-line" style="color: #cbd5e1; font-size: 1.2rem; margin-right: 10px;"></i>
-                                <input type="password" id="auth-password" placeholder="enter your password" required style="flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 0.95rem; color: #1e293b; padding: 0;">
-                                <i class="ri-eye-off-line toggle-password" style="cursor:pointer; margin-left:auto; color:#94a3b8; font-size:1.1rem;"></i>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; font-size: 0.85rem;">
-                            <label style="display: flex; align-items: center; color: #64748b; cursor: pointer; font-weight: 500;">
-                                <input type="checkbox" checked style="margin-right: 8px; accent-color: #ff7c88; width: 16px; height: 16px;">
-                                Remember Me
-                            </label>
-                            <a href="#" style="color: #ff7c88; text-decoration: none; font-weight: 600;">Forgot Password?</a>
-                        </div>
-
-                        <button type="submit" id="auth-submit" style="width: 100%; background-color: #ff7c88; color: white; padding: 15px; font-size: 1.1rem; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px rgba(255, 124, 136, 0.4); transition: transform 0.2s;">Login</button>
-                    </form>
-                    
-                    <div style="margin-top: 30px; text-align: center; font-size: 0.95rem; color: #94a3b8; font-weight: 500;">
-                        <span id="auth-switch-text">Don't have an Account ?</span>
-                        <button id="auth-switch-btn" style="background: none; border: none; color: #ff7c88; font-weight: 700; cursor: pointer; margin-left: 5px; font-size: 0.95rem;">Sign up</button>
-                    </div>
+    <div class="auth-form-card">
+        <h2 id="auth-title-text" style="font-size:1.5rem;text-align:center;margin-bottom:25px;font-family:'Outfit';">Log in or sign up</h2>
+        <form id="auth-form">
+            <div class="hidden" id="username-group">
+                <div class="auth-input-wrapper">
+                    <i class="ri-user-smile-line"></i>
+                    <input type="text" id="auth-username" placeholder="Username">
                 </div>
             </div>
+            <div class="auth-input-wrapper">
+                <i class="ri-mail-line"></i>
+                <input type="email" id="auth-email" placeholder="Email Address" required>
+            </div>
+            <div class="auth-input-wrapper">
+                <i class="ri-lock-password-line"></i>
+                <input type="password" id="auth-password" placeholder="Password" required>
+            </div>
+            <button type="submit" id="auth-submit">CONTINUE</button>
+        </form>
+        <div class="auth-switch">
+            <span id="auth-switch-text">Don't have an account?</span>
+            <button id="auth-switch-btn">Sign up</button>
         </div>
     </div>
+</div>
 
-    <!-- Create Post Modal -->
-    <div class="modal" id="create-post-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Create New Post</h3>
-                <button class="close-modal"><i class="ri-close-line"></i></button>
+<!-- ═══ CREATE POST MODAL ═════════════════════════════════════════ -->
+<div class="modal" id="create-post-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>New Post</h3>
+            <button class="close-modal" id="close-post-modal"><i class="ri-close-line"></i></button>
+        </div>
+        <div style="padding:20px;">
+            <div id="media-upload-area" style="height:220px;border:2px dashed var(--border);border-radius:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:#f4f7fb;margin-bottom:15px;position:relative;overflow:hidden;">
+                <i class="ri-image-add-line" style="font-size:3rem;color:var(--primary);margin-bottom:10px;"></i>
+                <p style="color:var(--text-muted);font-weight:600;">Click to upload photo or video</p>
+                <p style="color:var(--text-muted);font-size:0.8rem;margin-top:4px;">JPG, PNG, MP4, MOV supported</p>
+                <input type="file" id="post-media-input" accept="image/*,video/*" hidden>
+                <img id="post-image-preview" class="hidden" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+                <video id="post-video-preview" class="hidden" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" controls muted></video>
+                <button id="remove-media-btn" class="hidden" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;"><i class="ri-close-line"></i></button>
             </div>
-            <div class="modal-body">
-                <div class="image-upload-area" id="image-upload-area">
-                    <i class="ri-image-add-line"></i>
-                    <p>Click or drag to upload image</p>
-                    <input type="file" id="post-image-input" accept="image/*" hidden>
-                    <img id="post-image-preview" class="hidden">
-                </div>
-                <select id="post-type-select" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); margin-bottom: 1rem; outline: none;">
-                    <option value="post">Standard Photo</option>
-                    <option value="note">School Note</option>
-                </select>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:1rem; cursor:pointer; background:var(--bg-main); padding:10px; border-radius:12px;">
-                    <input type="checkbox" id="post-is-prompt" style="width:18px; height:18px; accent-color: var(--primary);">
-                    <span style="font-size:0.95rem; font-weight:500;">Submit to Daily Prompt <i class="ri-fire-fill" style="color:var(--accent);"></i></span>
-                </label>
-                <select id="post-unlock-select" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); margin-bottom: 1rem; outline: none;">
-                    <option value="0">Post Immediately</option>
-                    <option value="1">Time Capsule: Unlock in 1 Hour</option>
-                    <option value="12">Time Capsule: Unlock in 12 Hours</option>
-                    <option value="24">Time Capsule: Unlock in 24 Hours</option>
-                </select>
-                <textarea id="post-caption" placeholder="Write a caption..."></textarea>
-                <button class="btn-primary full-width" id="submit-post-btn">Share Post</button>
-            </div>
+            <textarea id="post-caption" placeholder="Write a caption..." style="width:100%;height:90px;border:1px solid var(--border);border-radius:12px;padding:14px;outline:none;resize:none;font-family:'Inter';font-size:0.95rem;margin-bottom:15px;"></textarea>
+            <button id="submit-post-btn" style="width:100%;background:var(--primary);color:white;border:none;padding:15px;border-radius:12px;font-weight:700;font-size:1.05rem;cursor:pointer;box-shadow:0 5px 15px rgba(0,98,230,0.3);">Share Post</button>
         </div>
     </div>
+</div>
 
-    <!-- Image Viewer Modal -->
-    <div class="modal" id="image-viewer-modal" style="z-index: 1000;">
-        <button class="close-modal" id="close-image-viewer" style="position: absolute; top: 1rem; right: 1rem; z-index: 10; font-size: 2.5rem; background: rgba(0,0,0,0.5); border-radius: 50%; padding: 5px;"><i class="ri-close-line"></i></button>
-        <img id="image-viewer-img" src="" style="max-width: 95vw; max-height: 95vh; object-fit: contain; cursor: zoom-out;">
+<!-- ═══ EDIT PROFILE MODAL ════════════════════════════════════════ -->
+<div class="modal" id="edit-profile-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Profile</h3>
+            <button class="close-modal" id="close-edit-modal"><i class="ri-close-line"></i></button>
+        </div>
+        <div style="padding:20px;">
+            <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:25px;">
+                <div class="avatar large" id="edit-avatar-preview" style="cursor:pointer;margin-bottom:10px;"></div>
+                <button onclick="document.getElementById('edit-avatar-input').click()" style="background:var(--primary-light);color:var(--primary);border:none;padding:8px 20px;border-radius:20px;font-weight:600;cursor:pointer;font-size:0.9rem;">Change Photo</button>
+                <input type="file" id="edit-avatar-input" accept="image/*" hidden>
+            </div>
+            <div style="margin-bottom:15px;">
+                <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">USERNAME</label>
+                <input type="text" id="edit-username" placeholder="Username" style="width:100%;padding:13px 16px;border:1px solid var(--border);border-radius:12px;outline:none;font-size:0.95rem;font-family:'Inter';">
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">BIO</label>
+                <textarea id="edit-bio" placeholder="Write something about yourself..." style="width:100%;height:80px;border:1px solid var(--border);border-radius:12px;padding:13px 16px;outline:none;resize:none;font-family:'Inter';font-size:0.95rem;"></textarea>
+            </div>
+            <button id="save-profile-btn" style="width:100%;background:var(--primary);color:white;border:none;padding:15px;border-radius:12px;font-weight:700;font-size:1.05rem;cursor:pointer;">Save Changes</button>
+        </div>
     </div>
+</div>
 
-    <!-- Notifications Toast -->
-    <div id="toast-container"></div>
+<!-- ═══ NEW CHAT USER SEARCH MODAL ═══════════════════════════════ -->
+<div class="modal" id="new-chat-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>New Message</h3>
+            <button class="close-modal" id="close-new-chat-modal"><i class="ri-close-line"></i></button>
+        </div>
+        <div style="padding:20px;">
+            <input type="text" id="new-chat-search" placeholder="Search people..." style="width:100%;padding:13px 16px;border:1px solid var(--border);border-radius:12px;outline:none;font-size:0.95rem;font-family:'Inter';">
+            <div id="new-chat-results" style="margin-top:15px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+    </div>
+</div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+<!-- ═══ IMAGE VIEWER MODAL ════════════════════════════════════════ -->
+<div class="modal" id="image-viewer-modal" style="z-index:10000;background:rgba(0,0,0,0.95);">
+    <button id="close-image-viewer" style="position:absolute;top:20px;left:20px;color:white;background:rgba(255,255,255,0.1);border:none;width:42px;height:42px;border-radius:50%;font-size:1.4rem;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="ri-close-line"></i></button>
+    <img id="image-viewer-img" src="" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- Toast -->
+<div id="toast-container" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:10px;"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
