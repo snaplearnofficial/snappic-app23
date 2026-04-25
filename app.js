@@ -1,800 +1,790 @@
-// ═══════════════════════════════════════════════════
-//  SNAPPIC — app.js
-// ═══════════════════════════════════════════════════
-const API_URL = '';
-let currentUser   = null;
-let currentChatUserId = null;
-let currentChatUsername = null;
-let currentChatAvatar   = null;
-let socket = null;
-let allUsersCache = {};
-let unreadMessages = 0;
-let unreadNotifs   = 0;
-let selectedMediaBase64 = null;
-let selectedMediaType   = null; // 'image' | 'video'
-let editAvatarBase64    = null;
-let typingTimer = null;
-let isTyping = false;
-let currentRoomId = null;
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const bcryptjs = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const path = require('path');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-// ── Utilities ─────────────────────────────────────
-const showToast = (msg, type = 'default') => {
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.style.background = type === 'error' ? '#ef4444' : '#1e293b';
-    t.innerText = msg;
-    document.getElementById('toast-container').appendChild(t);
-    setTimeout(() => t.remove(), 3000);
-};
+const app = express();
+const server = http.createServer(app);
 
-const formatTime = (iso) => {
-    const d = new Date(iso), now = new Date();
-    const diff = Math.floor((now - d) / 1000);
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff/60)}m`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-    return d.toLocaleDateString();
-};
-
-const escape = (s) => (s||'').toString()
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-const avatarHtml = (a, size = 40) => {
-    if (a && (a.startsWith('data:image') || a.startsWith('http')))
-        return `<img src="${a}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-    if (a && a.length <= 3)
-        return `<span style="font-size:${Math.round(size*0.35)}px;font-weight:700;">${escape(a)}</span>`;
-    return `<i class="ri-user-smile-fill"></i>`;
-};
-
-const token = () => localStorage.getItem('snappic_token');
-
-const apiFetch = (path, opts = {}) => fetch(API_URL + path, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}`, ...(opts.headers||{}) }
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['polling', 'websocket']
 });
 
-window.showView = (id) => {
-    document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
-    document.getElementById(id)?.classList.remove('hidden');
-    document.querySelectorAll('.nav-item').forEach(n => {
-        n.classList.toggle('active', n.dataset.target === id);
-    });
-    if (id === 'chat-view')    { loadConversations(); markMsgsRead(); }
-    if (id === 'profile-view') loadProfile(currentUser.id);
-    if (id === 'feed-view')    loadFeed();
-    if (id === 'notif-view')   loadNotifications();
-};
+app.use(cors({ origin: '*' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// ── Auth ──────────────────────────────────────────
-let isLoginMode = true;
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
 
-document.getElementById('auth-switch-btn')?.addEventListener('click', () => {
-    isLoginMode = !isLoginMode;
-    document.getElementById('auth-title-text').innerText  = isLoginMode ? 'Log in or sign up' : 'Create an account';
-    document.getElementById('username-group').classList.toggle('hidden', isLoginMode);
-    document.getElementById('auth-submit').innerText       = isLoginMode ? 'CONTINUE' : 'SIGN UP';
-    document.getElementById('auth-switch-text').innerText  = isLoginMode ? "Don't have an account?" : 'Already have an account?';
-    document.getElementById('auth-switch-btn').innerText   = isLoginMode ? 'Sign up' : 'Log in';
-});
+const MONGO_URI = process.env.MONGO_URI;
+const JWT_SECRET = process.env.JWT_SECRET || 'snappic_secret_change_in_production';
 
-document.getElementById('auth-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email    = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const username = document.getElementById('auth-username').value.trim();
-    const endpoint = isLoginMode ? '/api/login' : '/api/register';
-    const body     = isLoginMode ? { email, password } : { username, email, password };
-
-    document.getElementById('auth-submit').innerText = 'Please wait...';
-    try {
-        const res  = await fetch(API_URL + endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-        const data = await res.json();
-        if (data.error) { showToast(data.error, 'error'); return; }
-        localStorage.setItem('snappic_token', data.token);
-        initApp();
-    } catch { showToast('Connection error', 'error'); }
-    finally { document.getElementById('auth-submit').innerText = isLoginMode ? 'CONTINUE' : 'SIGN UP'; }
-});
-
-document.getElementById('logout-btn')?.addEventListener('click', () => {
-    localStorage.removeItem('snappic_token');
-    location.reload();
-});
-
-// ── Init ──────────────────────────────────────────
-async function initApp() {
-    if (!token()) return;
-    try {
-        const res  = await apiFetch('/api/me');
-        const data = await res.json();
-        if (data.error) { localStorage.removeItem('snappic_token'); return; }
-
-        currentUser = data.user;
-        document.getElementById('auth').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        document.getElementById('nav-username').innerText     = currentUser.username;
-        document.getElementById('header-username').innerText  = currentUser.username;
-        document.getElementById('nav-avatar').innerHTML       = avatarHtml(currentUser.avatar);
-
-        initSocket();
-        loadFeed();
-    } catch(e) { console.error(e); }
+if (!MONGO_URI) {
+  console.error('MONGO_URI is not set. Add it to Render environment variables.');
+  process.exit(1);
 }
 
-// ── Navigation ────────────────────────────────────
-document.querySelectorAll('.nav-item[data-target]').forEach(item => {
-    item.addEventListener('click', (e) => {
-        e.preventDefault();
-        showView(item.getAttribute('data-target'));
-    });
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Connected to MongoDB!'))
+  .catch(err => { console.error('MongoDB Error:', err.message); process.exit(1); });
+
+const userSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  username: { type: String, unique: true, trim: true },
+  email: { type: String, unique: true, lowercase: true, trim: true },
+  password: { type: String, select: false },
+  avatar: { type: String, default: '' },
+  bio: { type: String, default: '' },
+  followers: { type: [String], default: [] },
+  following: { type: [String], default: [] },
+  createdAt: { type: Date, default: Date.now }
 });
+const User = mongoose.model('User', userSchema);
 
-// ── Feed ──────────────────────────────────────────
-async function loadFeed() {
-    try {
-        const res  = await apiFetch('/api/posts');
-        const data = await res.json();
-        const c    = document.getElementById('feed-container');
-        c.innerHTML = '';
-        if (!data.posts?.length) {
-            c.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text-muted);">No posts yet — be the first!</div>';
-            return;
-        }
-        data.posts.forEach(p => c.appendChild(createPostElement(p)));
-    } catch(e) { console.error(e); }
-}
+const postSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  authorId: String,
+  caption: { type: String, default: '' },
+  image: String,
+  video: String,
+  mediaType: { type: String, enum: ['image', 'video', 'text'], default: 'text' },
+  postType: { type: String, default: 'post' },
+  likes: { type: [String], default: [] },
+  comments: { type: Array, default: [] },
+  createdAt: { type: Date, default: Date.now }
+});
+const Post = mongoose.model('Post', postSchema);
 
-function createPostElement(post) {
-    const div = document.createElement('div');
-    div.className = 'post-card';
-    div.id = `post-${post.id}`;
+const messageSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  senderId: String,
+  receiverId: String,
+  text: String,
+  seen: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+const Message = mongoose.model('Message', messageSchema);
 
-    const mediaHtml = () => {
-        if (post.mediaType === 'video' && post.video) {
-            return `<video src="${post.video}" style="width:100%;max-height:500px;object-fit:contain;background:#000;" controls playsinline></video>`;
-        }
-        if (post.image) {
-            return `<img src="${post.image}" style="width:100%;max-height:500px;object-fit:contain;cursor:pointer;" onclick="openImageViewer('${post.id}')">`;
-        }
-        return '';
-    };
+const notificationSchema = new mongoose.Schema({
+  id: String,
+  userId: String,
+  type: String,
+  senderId: String,
+  senderUsername: String,
+  senderAvatar: String,
+  postId: String,
+  read: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+const Notification = mongoose.model('Notification', notificationSchema);
 
-    const commentsHtml = (post.comments||[]).map(c => `
-        <div class="comment">
-            <div class="avatar" style="width:30px;height:30px;flex-shrink:0;">${avatarHtml('',30)}</div>
-            <div><strong>${escape(c.username)}</strong> ${escape(c.text)}</div>
-        </div>`).join('');
+function generateId() { return Math.random().toString(36).substr(2, 9) + Date.now().toString(36); }
 
-    div.innerHTML = `
-        <div class="post-header">
-            <div class="post-user" onclick="loadProfile('${post.author.id}')">
-                <div class="avatar">${avatarHtml(post.author.avatar)}</div>
-                <div>
-                    <div class="name">@${escape(post.author.username)}</div>
-                    <div class="time">${formatTime(post.createdAt)}</div>
-                </div>
-            </div>
-            ${post.author.id === currentUser.id ? `<button class="post-opt" onclick="deletePost('${post.id}')"><i class="ri-delete-bin-line"></i></button>` : '<button class="post-opt"><i class="ri-more-2-fill"></i></button>'}
-        </div>
-
-        ${mediaHtml() ? `<div class="post-image-container" style="background:#0f172a;">${mediaHtml()}</div>` : ''}
-
-        <div class="post-content-area">
-            ${post.caption ? `<p class="post-caption">${escape(post.caption)}</p>` : ''}
-            <div style="display:flex;gap:15px;margin-bottom:12px;">
-                <button id="like-btn-${post.id}" onclick="toggleLike('${post.id}')" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.95rem;font-weight:600;color:${post.isLiked?'#ef4444':'var(--text-muted)'};">
-                    <i class="${post.isLiked?'ri-heart-3-fill':'ri-heart-3-line'}" style="font-size:1.4rem;"></i>
-                    <span id="like-count-${post.id}">${post.likes}</span>
-                </button>
-                <button onclick="toggleComments('${post.id}')" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.95rem;font-weight:600;color:var(--text-muted);">
-                    <i class="ri-chat-3-line" style="font-size:1.4rem;"></i>
-                    <span id="comment-count-${post.id}">${post.commentCount}</span>
-                </button>
-                <button onclick="copyLink('${post.id}')" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.95rem;font-weight:600;color:var(--text-muted);margin-left:auto;">
-                    <i class="ri-share-forward-line" style="font-size:1.4rem;"></i>
-                </button>
-            </div>
-            <div id="comments-section-${post.id}" class="hidden">
-                <div class="post-comments" id="comments-${post.id}">
-                    ${commentsHtml || '<span style="color:var(--text-muted);font-size:0.85rem;">No comments yet</span>'}
-                </div>
-                <div class="comment-input-area">
-                    <div class="avatar" style="width:32px;height:32px;">${avatarHtml(currentUser?.avatar,32)}</div>
-                    <input type="text" id="comment-input-${post.id}" placeholder="Add a comment..." onkeypress="if(event.key==='Enter')addComment('${post.id}')">
-                    <button onclick="addComment('${post.id}')">Post</button>
-                </div>
-            </div>
-        </div>`;
-    return div;
-}
-
-window.toggleComments = (pid) => {
-    document.getElementById(`comments-section-${pid}`)?.classList.toggle('hidden');
+const auth = (req, res, next) => {
+  const token = (req.headers.authorization || '').split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: 'Invalid token' }); }
 };
 
-window.toggleLike = async (pid) => {
-    const btn   = document.getElementById(`like-btn-${pid}`);
-    const icon  = btn?.querySelector('i');
-    const count = document.getElementById(`like-count-${pid}`);
-    const liked = icon?.classList.contains('ri-heart-3-fill');
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    if (!username || !email || !password) return res.status(400).json({ error: 'All fields required' });
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) return res.status(400).json({ error: 'Username or email already taken' });
+    const hashed = await bcryptjs.hash(password, 10);
+    const user = new User({ id: generateId(), username, email, password: hashed, avatar: username.substring(0, 2).toUpperCase() });
+    await user.save();
+    const token = jwt.sign({ id: user.id, username: user.username, avatar: user.avatar }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    // Optimistic
-    if (icon) {
-        icon.className = liked ? 'ri-heart-3-line' : 'ri-heart-3-fill';
-        btn.style.color = liked ? 'var(--text-muted)' : '#ef4444';
-        if (count) count.innerText = parseInt(count.innerText) + (liked ? -1 : 1);
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email }).select('+password');
+    if (!user || !(await bcryptjs.compare(password, user.password)))
+      return res.status(401).json({ error: 'Invalid email or password' });
+    const token = jwt.sign({ id: user.id, username: user.username, avatar: user.avatar }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/me', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    res.json({ user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio, followers: user.followers, following: user.following } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/users/avatar', auth, async (req, res) => {
+  try {
+    const { avatar } = req.body;
+    if (!avatar) return res.status(400).json({ error: 'Avatar required' });
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    user.avatar = avatar;
+    await user.save();
+    res.json({ success: true, avatar });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/users/me', auth, async (req, res) => {
+  try {
+    const { username, bio, avatar } = req.body;
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (username && username !== user.username) {
+      const taken = await User.findOne({ username });
+      if (taken) return res.status(400).json({ error: 'Username already taken' });
+      user.username = username.trim();
     }
-    try {
-        await apiFetch(`/api/posts/${pid}/like`, { method:'POST' });
-    } catch(e) { console.error(e); }
-};
-
-window.addComment = async (pid) => {
-    const input = document.getElementById(`comment-input-${pid}`);
-    const text  = input?.value.trim();
-    if (!text) return;
-    input.value = '';
-    try {
-        await apiFetch(`/api/posts/${pid}/comment`, { method:'POST', body:JSON.stringify({ text }) });
-    } catch(e) { console.error(e); }
-};
-
-window.deletePost = async (pid) => {
-    if (!confirm('Delete this post?')) return;
-    try {
-        await apiFetch(`/api/posts/${pid}`, { method:'DELETE' });
-        document.getElementById(`post-${pid}`)?.remove();
-        showToast('Post deleted');
-    } catch(e) { showToast('Failed to delete', 'error'); }
-};
-
-window.copyLink = (pid) => {
-    navigator.clipboard.writeText(window.location.origin + '?post=' + pid);
-    showToast('Link copied!');
-};
-
-window.openImageViewer = (pid) => {
-    const post = document.getElementById(`post-${pid}`);
-    const img  = post?.querySelector('img');
-    if (!img) return;
-    document.getElementById('image-viewer-img').src = img.src;
-    document.getElementById('image-viewer-modal').classList.add('active');
-};
-document.getElementById('close-image-viewer')?.addEventListener('click', () => {
-    document.getElementById('image-viewer-modal').classList.remove('active');
+    if (bio !== undefined) user.bio = bio.trim();
+    if (avatar) user.avatar = avatar;
+    await user.save();
+    res.json({ success: true, user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Create Post Modal ─────────────────────────────
-const postModal = document.getElementById('create-post-modal');
-document.getElementById('open-post-modal')?.addEventListener('click', () => postModal.classList.add('active'));
-document.getElementById('open-post-modal-mobile')?.addEventListener('click', () => postModal.classList.add('active'));
-document.getElementById('close-post-modal')?.addEventListener('click', () => { postModal.classList.remove('active'); resetPostModal(); });
-
-const mediaInput   = document.getElementById('post-media-input');
-const imgPreview   = document.getElementById('post-image-preview');
-const vidPreview   = document.getElementById('post-video-preview');
-const removeBtn    = document.getElementById('remove-media-btn');
-
-document.getElementById('media-upload-area')?.addEventListener('click', (e) => {
-    if (e.target.closest('#remove-media-btn')) return;
-    mediaInput.click();
+app.get('/api/users/search', auth, async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json({ users: [] });
+  const users = await User.find({ username: new RegExp(q, 'i') }).limit(10);
+  res.json({ users: users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar, bio: u.bio })) });
 });
 
-mediaInput?.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        selectedMediaBase64 = ev.target.result;
-        selectedMediaType   = file.type.startsWith('video') ? 'video' : 'image';
-        if (selectedMediaType === 'video') {
-            vidPreview.src = selectedMediaBase64;
-            vidPreview.classList.remove('hidden');
-            imgPreview.classList.add('hidden');
-        } else {
-            imgPreview.src = selectedMediaBase64;
-            imgPreview.classList.remove('hidden');
-            vidPreview.classList.add('hidden');
-        }
-        removeBtn.classList.remove('hidden');
-    };
-    reader.readAsDataURL(file);
+app.get('/api/users/:id', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ id: req.params.id });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const posts = await Post.find({ authorId: user.id }).sort({ createdAt: -1 });
+    res.json({
+      user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio, followers: user.followers.length, following: user.following.length, isFollowing: user.followers.includes(req.user.id) },
+      posts: posts.map(p => ({ id: p.id, caption: p.caption, image: p.image, video: p.video, mediaType: p.mediaType, likes: p.likes, createdAt: p.createdAt }))
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-removeBtn?.addEventListener('click', (e) => { e.stopPropagation(); resetPostModal(); });
-
-function resetPostModal() {
-    selectedMediaBase64 = null;
-    selectedMediaType   = null;
-    imgPreview.src = ''; imgPreview.classList.add('hidden');
-    vidPreview.src = ''; vidPreview.classList.add('hidden');
-    removeBtn.classList.add('hidden');
-    document.getElementById('post-caption').value = '';
-    mediaInput.value = '';
-}
-
-document.getElementById('submit-post-btn')?.addEventListener('click', async () => {
-    const caption = document.getElementById('post-caption').value.trim();
-    if (!caption && !selectedMediaBase64) return showToast('Add a caption or media');
-    const btn = document.getElementById('submit-post-btn');
-    btn.innerText = 'Sharing...'; btn.disabled = true;
-    try {
-        const body = {
-            caption,
-            mediaType: selectedMediaType || 'text',
-            ...(selectedMediaType === 'video' ? { video: selectedMediaBase64 } : {}),
-            ...(selectedMediaType === 'image' ? { image: selectedMediaBase64 } : {}),
-        };
-        const res = await apiFetch('/api/posts', { method:'POST', body:JSON.stringify(body) });
-        if (res.ok) { postModal.classList.remove('active'); resetPostModal(); showToast('Post shared!'); }
-        else showToast('Failed to share', 'error');
-    } catch { showToast('Failed to share', 'error'); }
-    btn.innerText = 'Share Post'; btn.disabled = false;
+app.post('/api/users/:id/follow', auth, async (req, res) => {
+  if (req.params.id === req.user.id) return res.status(400).json({ error: 'Cannot follow yourself' });
+  const target = await User.findOne({ id: req.params.id });
+  const me = await User.findOne({ id: req.user.id });
+  if (!target || !me) return res.status(404).json({ error: 'User not found' });
+  const idx = target.followers.indexOf(req.user.id);
+  if (idx > -1) {
+    target.followers.splice(idx, 1);
+    const mi = me.following.indexOf(target.id);
+    if (mi > -1) me.following.splice(mi, 1);
+  } else {
+    target.followers.push(req.user.id);
+    me.following.push(target.id);
+    const notif = new Notification({ id: generateId(), userId: target.id, type: 'follow', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar });
+    await notif.save();
+    const sock = userToSocket[target.id];
+    if (sock) io.to(sock).emit('new_notification', notif);
+  }
+  await target.save(); await me.save();
+  res.json({ success: true, isFollowing: target.followers.includes(req.user.id), followers: target.followers.length });
 });
 
-// ── Search / Explore ──────────────────────────────
-document.getElementById('search-input')?.addEventListener('input', async (e) => {
-    const q = e.target.value.trim();
-    const c = document.getElementById('search-results');
-    if (!q) { c.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px 0;">Search for people to connect</div>'; return; }
-    try {
-        const res  = await apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        c.innerHTML = '';
-        if (!data.users?.length) { c.innerHTML = '<div style="color:var(--text-muted);padding:20px 0;">No users found</div>'; return; }
-        data.users.forEach(u => {
-            const div = document.createElement('div');
-            div.style = 'display:flex;align-items:center;justify-content:space-between;background:white;padding:14px;border-radius:14px;margin-bottom:10px;border:1px solid var(--border);cursor:pointer;';
-            div.innerHTML = `
-                <div style="display:flex;align-items:center;gap:12px;" onclick="loadProfile('${u.id}')">
-                    <div class="avatar" style="width:48px;height:48px;">${avatarHtml(u.avatar,48)}</div>
-                    <div><strong>${escape(u.username)}</strong><div style="font-size:0.83rem;color:var(--text-muted);">${escape(u.bio||'')}</div></div>
-                </div>
-                <button onclick="loadProfile('${u.id}')" style="background:var(--primary-light);color:var(--primary);border:none;padding:8px 18px;border-radius:20px;font-weight:600;cursor:pointer;">View</button>`;
-            c.appendChild(div);
-        });
-    } catch(e) { console.error(e); }
+app.get('/api/posts', auth, async (req, res) => {
+  try {
+    const posts = await Post.find().sort({ createdAt: -1 }).limit(50);
+    const result = await Promise.all(posts.map(async p => {
+      const author = await User.findOne({ id: p.authorId }) || { id: p.authorId, username: 'Deleted User', avatar: '' };
+      return { id: p.id, author: { id: author.id, username: author.username, avatar: author.avatar }, caption: p.caption, image: p.image, video: p.video, mediaType: p.mediaType || 'text', postType: p.postType || 'post', likes: p.likes.length, isLiked: p.likes.includes(req.user.id), comments: p.comments.slice(-5), commentCount: p.comments.length, createdAt: p.createdAt };
+    }));
+    res.json({ posts: result });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Profile ───────────────────────────────────────
-window.loadProfile = async (userId) => {
-    try {
-        const res  = await apiFetch(`/api/users/${userId}`);
-        const data = await res.json();
-        if (data.error) return showToast(data.error, 'error');
-        const u = data.user;
-
-        document.getElementById('profile-username').innerText = u.username;
-        document.getElementById('profile-bio').innerText      = u.bio || '';
-        document.getElementById('profile-avatar').innerHTML   = avatarHtml(u.avatar, 80);
-        document.getElementById('profile-posts-count').innerText = data.posts.length;
-        document.getElementById('profile-followers').innerText   = u.followers;
-        document.getElementById('profile-following').innerText   = u.following;
-
-        const actions = document.getElementById('profile-actions');
-        actions.innerHTML = '';
-
-        if (u.id === currentUser.id) {
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn-secondary';
-            editBtn.innerHTML = '<i class="ri-edit-line"></i> Edit Profile';
-            editBtn.onclick = openEditProfile;
-            actions.appendChild(editBtn);
-        } else {
-            const followBtn = document.createElement('button');
-            followBtn.className = u.isFollowing ? 'btn-secondary' : 'btn-primary';
-            followBtn.innerText = u.isFollowing ? 'Following' : 'Follow';
-            followBtn.onclick   = () => toggleFollow(u.id, followBtn);
-            const msgBtn = document.createElement('button');
-            msgBtn.className  = 'btn-secondary';
-            msgBtn.innerHTML  = '<i class="ri-chat-3-line"></i> Message';
-            msgBtn.onclick    = () => openChat(u.id, u.username, u.avatar);
-            actions.appendChild(followBtn);
-            actions.appendChild(msgBtn);
-        }
-
-        const grid = document.getElementById('profile-grid-post');
-        grid.innerHTML = '';
-        data.posts.forEach(p => {
-            const cell = document.createElement('div');
-            cell.style = 'aspect-ratio:1;background:#0f172a;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;';
-            if (p.mediaType === 'video' && p.video) {
-                cell.innerHTML = `<video src="${p.video}" style="width:100%;height:100%;object-fit:cover;" muted></video><div style="position:absolute;top:6px;right:6px;color:white;font-size:1rem;"><i class="ri-play-circle-fill"></i></div>`;
-            } else if (p.image) {
-                cell.innerHTML = `<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`;
-            } else {
-                cell.innerHTML = `<div style="padding:8px;display:flex;align-items:center;height:100%;color:white;font-size:0.8rem;">${escape(p.caption)}</div>`;
-            }
-            grid.appendChild(cell);
-        });
-
-        showView('profile-view');
-    } catch(e) { console.error(e); }
-};
-
-async function toggleFollow(userId, btn) {
-    try {
-        const res  = await apiFetch(`/api/users/${userId}/follow`, { method:'POST' });
-        const data = await res.json();
-        if (data.success) {
-            btn.className = data.isFollowing ? 'btn-secondary' : 'btn-primary';
-            btn.innerText = data.isFollowing ? 'Following' : 'Follow';
-            document.getElementById('profile-followers').innerText = data.followers;
-        }
-    } catch(e) { console.error(e); }
-}
-
-// ── Edit Profile ──────────────────────────────────
-function openEditProfile() {
-    document.getElementById('edit-username').value        = currentUser.username;
-    document.getElementById('edit-bio').value             = currentUser.bio || '';
-    document.getElementById('edit-avatar-preview').innerHTML = avatarHtml(currentUser.avatar, 80);
-    editAvatarBase64 = null;
-    document.getElementById('edit-profile-modal').classList.add('active');
-}
-
-document.getElementById('close-edit-modal')?.addEventListener('click', () => {
-    document.getElementById('edit-profile-modal').classList.remove('active');
+app.post('/api/posts', auth, async (req, res) => {
+  try {
+    const { caption, image, video, mediaType, postType } = req.body;
+    if (!caption && !image && !video) return res.status(400).json({ error: 'Post needs content' });
+    const post = new Post({
+      id: generateId(), authorId: req.user.id, caption: caption || '',
+      image: image || null, video: video || null,
+      mediaType: mediaType || (video ? 'video' : image ? 'image' : 'text'),
+      postType: postType || 'post'
+    });
+    await post.save();
+    const author = await User.findOne({ id: req.user.id });
+    const data = { id: post.id, author: { id: author.id, username: author.username, avatar: author.avatar }, caption: post.caption, image: post.image, video: post.video, mediaType: post.mediaType, postType: post.postType, likes: 0, isLiked: false, comments: [], commentCount: 0, createdAt: post.createdAt };
+    io.emit('new_post', data);
+    res.json({ success: true, post: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-document.getElementById('edit-avatar-input')?.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        editAvatarBase64 = ev.target.result;
-        document.getElementById('edit-avatar-preview').innerHTML = `<img src="${editAvatarBase64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-    };
-    reader.readAsDataURL(file);
+app.delete('/api/posts/:id', auth, async (req, res) => {
+  try {
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    if (post.authorId !== req.user.id) return res.status(403).json({ error: 'Not your post' });
+    await Post.deleteOne({ id: req.params.id });
+    io.emit('post_deleted', { postId: post.id });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
-    const username = document.getElementById('edit-username').value.trim();
-    const bio      = document.getElementById('edit-bio').value.trim();
-    const btn      = document.getElementById('save-profile-btn');
-    if (!username) return showToast('Username cannot be empty', 'error');
-
-    btn.innerText = 'Saving...'; btn.disabled = true;
-    try {
-        const body = { username, bio };
-        if (editAvatarBase64) body.avatar = editAvatarBase64;
-
-        const res  = await apiFetch('/api/users/me', { method:'PATCH', body:JSON.stringify(body) });
-        const data = await res.json();
-
-        if (data.error) { showToast(data.error, 'error'); return; }
-
-        currentUser.username = data.user.username;
-        currentUser.bio      = data.user.bio;
-        if (data.user.avatar) currentUser.avatar = data.user.avatar;
-
-        document.getElementById('nav-username').innerText   = currentUser.username;
-        document.getElementById('nav-avatar').innerHTML     = avatarHtml(currentUser.avatar);
-        document.getElementById('edit-profile-modal').classList.remove('active');
-        showToast('Profile updated!');
-        loadProfile(currentUser.id);
-    } catch { showToast('Failed to save', 'error'); }
-    btn.innerText = 'Save Changes'; btn.disabled = false;
-});
-
-// ── Notifications ─────────────────────────────────
-async function loadNotifications() {
-    try {
-        const res  = await apiFetch('/api/notifications');
-        const data = await res.json();
-        const c    = document.getElementById('notif-list');
-        await apiFetch('/api/notifications/read', { method:'POST' });
-        unreadNotifs = 0; updateNotifBadge();
-
-        if (!data.notifications?.length) {
-            c.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px 0;">No notifications yet</div>';
-            return;
-        }
-        c.innerHTML = '';
-        data.notifications.forEach(n => {
-            const div = document.createElement('div');
-            div.style = 'display:flex;align-items:center;gap:12px;background:white;padding:14px;border-radius:14px;margin-bottom:10px;border:1px solid var(--border);';
-            const icons = { like:'ri-heart-3-fill', comment:'ri-chat-3-fill', follow:'ri-user-add-fill', message:'ri-message-3-fill' };
-            div.innerHTML = `
-                <div class="avatar" style="width:44px;height:44px;">${avatarHtml(n.senderAvatar,44)}</div>
-                <div style="flex:1;">
-                    <strong>${escape(n.senderUsername)}</strong>
-                    ${n.type==='like'?' liked your post.':n.type==='comment'?' commented on your post.':n.type==='follow'?' started following you.':' sent you a message.'}
-                    <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${formatTime(n.createdAt)}</div>
-                </div>
-                <i class="${icons[n.type]||'ri-notification-3-fill'}" style="font-size:1.3rem;color:var(--primary);"></i>`;
-            c.appendChild(div);
-        });
-    } catch(e) { console.error(e); }
-}
-
-function updateNotifBadge() {
-    const b = document.getElementById('notif-badge');
-    const d = document.getElementById('notif-dot');
-    if (b) { b.style.display = unreadNotifs > 0 ? 'block' : 'none'; b.innerText = unreadNotifs; }
-    if (d) { d.style.display = unreadNotifs > 0 ? 'block' : 'none'; }
-}
-
-// ── Chat ──────────────────────────────────────────
-async function loadConversations() {
-    try {
-        const res  = await apiFetch('/api/conversations');
-        const data = await res.json();
-        const list = document.getElementById('conversations-list');
-        list.innerHTML = '';
-        if (!data.users?.length) {
-            list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.9rem;">No conversations yet</div>';
-            return;
-        }
-        data.users.forEach(u => {
-            allUsersCache[u.id] = u;
-            const div = document.createElement('div');
-            div.className = `convo-item${u.id === currentChatUserId ? ' active' : ''}`;
-            div.style = 'display:flex;align-items:center;gap:12px;padding:14px 20px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.15s;';
-            div.onmouseenter = () => { if(u.id!==currentChatUserId) div.style.background='var(--bg-main)'; };
-            div.onmouseleave = () => { if(u.id!==currentChatUserId) div.style.background=''; };
-            div.onclick = () => openChat(u.id, u.username, u.avatar);
-            div.innerHTML = `
-                <div style="position:relative;">
-                    <div class="avatar" style="width:50px;height:50px;">${avatarHtml(u.avatar,50)}</div>
-                </div>
-                <div style="flex:1;overflow:hidden;">
-                    <div style="font-weight:700;font-size:1rem;display:flex;justify-content:space-between;align-items:center;">
-                        <span>${escape(u.username)}</span>
-                        ${u.unread>0?`<span style="background:var(--primary);color:white;font-size:0.75rem;padding:2px 7px;border-radius:12px;">${u.unread}</span>`:''}
-                    </div>
-                    <div style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escape(u.lastMessage||'')}</div>
-                </div>`;
-            list.appendChild(div);
-        });
-    } catch(e) { console.error(e); }
-}
-
-window.openChat = async (userId, username, avatar) => {
-    currentChatUserId   = userId;
-    currentChatUsername = username;
-    currentChatAvatar   = avatar;
-
-    document.getElementById('chat-empty-state').classList.add('hidden');
-    document.getElementById('chat-active-state').classList.remove('hidden');
-    document.getElementById('chat-active-name').innerText    = username;
-    document.getElementById('chat-active-avatar').innerHTML  = avatarHtml(avatar,42);
-    document.getElementById('typing-indicator').style.display = 'none';
-
-    const isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-        document.getElementById('chat-area').style.display = 'flex';
-        document.getElementById('close-chat-mobile').style.display = 'flex';
+app.post('/api/posts/:id/like', auth, async (req, res) => {
+  try {
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    const idx = post.likes.indexOf(req.user.id);
+    let liked;
+    if (idx > -1) { post.likes.splice(idx, 1); liked = false; }
+    else {
+      post.likes.push(req.user.id); liked = true;
+      if (post.authorId !== req.user.id) {
+        const notif = new Notification({ id: generateId(), userId: post.authorId, type: 'like', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar, postId: post.id });
+        await notif.save();
+        const sock = userToSocket[post.authorId];
+        if (sock) io.to(sock).emit('new_notification', notif);
+      }
     }
-
-    showView('chat-view');
-    try {
-        const res  = await apiFetch(`/api/messages/${userId}`);
-        const data = await res.json();
-        const c    = document.getElementById('messages-container');
-        c.innerHTML = '';
-        (data.messages||[]).forEach(m => appendMessage(m));
-        scrollToBottom();
-        markMsgsRead();
-    } catch(e) { console.error(e); }
-};
-
-window.viewChatUserProfile = () => {
-    if (currentChatUserId) loadProfile(currentChatUserId);
-};
-
-document.getElementById('close-chat-mobile')?.addEventListener('click', () => {
-    document.getElementById('chat-active-state').classList.add('hidden');
-    document.getElementById('chat-empty-state').classList.remove('hidden');
-    document.getElementById('close-chat-mobile').style.display = 'none';
-    currentChatUserId = null;
+    await post.save();
+    io.emit('post_liked', { postId: post.id, likes: post.likes.length, liked });
+    res.json({ success: true, liked, likes: post.likes.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-document.getElementById('send-msg-btn')?.addEventListener('click', sendMessage);
-document.getElementById('message-input')?.addEventListener('keypress', (e) => { if(e.key==='Enter') sendMessage(); });
-
-document.getElementById('message-input')?.addEventListener('input', () => {
-    if (!currentChatUserId) return;
-    if (!isTyping) { isTyping = true; socket?.emit('typing', { receiverId: currentChatUserId }); }
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => { isTyping = false; socket?.emit('stop_typing', { receiverId: currentChatUserId }); }, 1500);
+app.post('/api/posts/:id/comment', auth, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'Text required' });
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    const comment = { id: generateId(), username: req.user.username, text, createdAt: new Date().toISOString() };
+    post.comments.push(comment);
+    await post.save();
+    if (post.authorId !== req.user.id) {
+      const notif = new Notification({ id: generateId(), userId: post.authorId, type: 'comment', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar, postId: post.id });
+      await notif.save();
+      const sock = userToSocket[post.authorId];
+      if (sock) io.to(sock).emit('new_notification', notif);
+    }
+    io.emit('new_comment', { postId: post.id, comment, commentCount: post.comments.length });
+    res.json({ success: true, comment });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-function sendMessage() {
-    const input = document.getElementById('message-input');
-    const text  = input.value.trim();
-    if (!text || !currentChatUserId) return;
-    socket?.emit('direct_message', { receiverId: currentChatUserId, text });
-    input.value = '';
-    isTyping = false;
-    socket?.emit('stop_typing', { receiverId: currentChatUserId });
+app.get('/api/notifications', auth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 }).limit(20);
+    res.json({ notifications });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/notifications/read', auth, async (req, res) => {
+  try {
+    await Notification.updateMany({ userId: req.user.id }, { read: true });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/messages/:userId', auth, async (req, res) => {
+  const msgs = await Message.find({ $or: [{ senderId: req.user.id, receiverId: req.params.userId }, { senderId: req.params.userId, receiverId: req.user.id }] }).sort({ createdAt: 1 });
+  await Message.updateMany({ senderId: req.params.userId, receiverId: req.user.id, seen: false }, { seen: true });
+  res.json({ messages: msgs });
+});
+
+app.get('/api/conversations', auth, async (req, res) => {
+  const messages = await Message.find({ $or: [{ senderId: req.user.id }, { receiverId: req.user.id }] }).sort({ createdAt: -1 });
+  const userIds = new Set();
+  messages.forEach(m => {
+    if (m.senderId !== req.user.id) userIds.add(m.senderId);
+    if (m.receiverId !== req.user.id) userIds.add(m.receiverId);
+  });
+  const users = await User.find({ id: { $in: Array.from(userIds) } });
+  const result = await Promise.all(users.map(async u => {
+    const lastMsg = messages.find(m => m.senderId === u.id || m.receiverId === u.id);
+    const unread = await Message.countDocuments({ senderId: u.id, receiverId: req.user.id, seen: false });
+    return { id: u.id, username: u.username, avatar: u.avatar, lastMessage: lastMsg ? lastMsg.text : '', unread };
+  }));
+  res.json({ users: result });
+});
+
+const socketToUser = {};
+const userToSocket = {};
+
+io.on('connection', (socket) => {
+  socket.on('user_join', ({ id }) => {
+    socketToUser[socket.id] = id;
+    userToSocket[id] = socket.id;
+    io.emit('online_count', Object.keys(userToSocket).length);
+  });
+
+  socket.on('typing', ({ receiverId }) => {
+    const sock = userToSocket[receiverId];
+    if (sock) io.to(sock).emit('user_typing', { senderId: socketToUser[socket.id] });
+  });
+
+  socket.on('stop_typing', ({ receiverId }) => {
+    const sock = userToSocket[receiverId];
+    if (sock) io.to(sock).emit('user_stop_typing', { senderId: socketToUser[socket.id] });
+  });
+
+  socket.on('direct_message', async ({ receiverId, text }) => {
+    const senderId = socketToUser[socket.id];
+    if (!senderId || !receiverId || !text) return;
+    const msg = new Message({ id: generateId(), senderId, receiverId, text });
+    await msg.save();
+    const msgData = { id: msg.id, senderId, receiverId, text, seen: false, createdAt: msg.createdAt };
+    socket.emit('new_direct_message', msgData);
+    const receiverSocketId = userToSocket[receiverId];
+    if (receiverSocketId) io.to(receiverSocketId).emit('new_direct_message', msgData);
+    const sender = await User.findOne({ id: senderId });
+    if (sender) {
+      const notif = new Notification({ id: generateId(), userId: receiverId, type: 'message', senderId, senderUsername: sender.username, senderAvatar: sender.avatar });
+      await notif.save();
+      if (receiverSocketId) io.to(receiverSocketId).emit('new_notification', notif);
+    }
+  });
+
+  socket.on('message_seen', async ({ messageId }) => {
+    await Message.findOneAndUpdate({ id: messageId }, { seen: true });
+    const msg = await Message.findOne({ id: messageId });
+    if (msg) {
+      const senderSocket = userToSocket[msg.senderId];
+      if (senderSocket) io.to(senderSocket).emit('message_seen', { messageId });
+    }
+  });
+
+  const roomMessages = { general: [], announcements: [], random: [] };
+
+  socket.on('join_room', (roomId) => {
+    Object.keys(roomMessages).forEach(r => socket.leave(r));
+    socket.join(roomId);
+    socket.emit('room_history', roomMessages[roomId] || []);
+  });
+
+  socket.on('room_message', async ({ roomId, text }) => {
+    const senderId = socketToUser[socket.id];
+    if (!senderId || !roomId || !text) return;
+    const sender = await User.findOne({ id: senderId });
+    if (!sender) return;
+    const msg = { id: generateId(), senderId, senderName: sender.username, senderAvatar: sender.avatar, text, createdAt: new Date().toISOString() };
+    if (!roomMessages[roomId]) roomMessages[roomId] = [];
+    roomMessages[roomId].push(msg);
+    if (roomMessages[roomId].length > 100) roomMessages[roomId].shift();
+    io.to(roomId).emit('new_room_message', { roomId, msg });
+  });
+
+  socket.on('disconnect', () => {
+    const userId = socketToUser[socket.id];
+    if (userId) delete userToSocket[userId];
+    delete socketToUser[socket.id];
+    io.emit('online_count', Object.keys(userToSocket).length);
+  });
+});
+
+app.use((req, res) => { res.sendFile(path.join(publicPath, 'index.html')); });
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Snappic running on port ${PORT}`));
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const bcryptjs = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const path = require('path');
+const mongoose = require('mongoose');
+require('dotenv').config();
+
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['polling', 'websocket']
+});
+
+app.use(cors({ origin: '*' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
+
+const MONGO_URI = process.env.MONGO_URI;
+const JWT_SECRET = process.env.JWT_SECRET || 'snappic_secret_change_in_production';
+
+if (!MONGO_URI) {
+  console.error('MONGO_URI is not set. Add it to Render environment variables.');
+  process.exit(1);
 }
 
-function appendMessage(msg) {
-    const c    = document.getElementById('messages-container');
-    const isMe = msg.senderId === currentUser.id;
-    const div  = document.getElementById(`msg-${msg.id}`) || document.createElement('div');
-    div.id     = `msg-${msg.id}`;
-    div.style  = `max-width:70%;padding:11px 16px;border-radius:20px;font-size:0.95rem;line-height:1.4;word-wrap:break-word;align-self:${isMe?'flex-end':'flex-start'};${isMe?'background:var(--primary);color:white;border-bottom-right-radius:5px;':'background:white;color:var(--text-main);border-bottom-left-radius:5px;box-shadow:0 2px 5px rgba(0,0,0,0.06);'}`;
-    div.innerHTML = `
-        <span>${escape(msg.text)}</span>
-        <div style="font-size:0.68rem;opacity:0.6;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
-            ${formatTime(msg.createdAt)}
-            ${isMe ? `<i class="${msg.seen?'ri-check-double-line':'ri-check-line'}" id="seen-${msg.id}" style="${msg.seen?'color:#60a5fa':''}"></i>` : ''}
-        </div>`;
-    if (!document.getElementById(`msg-${msg.id}`)) c.appendChild(div);
-}
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Connected to MongoDB!'))
+  .catch(err => { console.error('MongoDB Error:', err.message); process.exit(1); });
 
-function scrollToBottom() {
-    const c = document.getElementById('messages-container');
-    if (c) c.scrollTop = c.scrollHeight;
-}
+const userSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  username: { type: String, unique: true, trim: true },
+  email: { type: String, unique: true, lowercase: true, trim: true },
+  password: { type: String, select: false },
+  avatar: { type: String, default: '' },
+  bio: { type: String, default: '' },
+  followers: { type: [String], default: [] },
+  following: { type: [String], default: [] },
+  createdAt: { type: Date, default: Date.now }
+});
+const User = mongoose.model('User', userSchema);
 
-function markMsgsRead() {
-    unreadMessages = 0;
-    document.getElementById('msg-badge').style.display = 'none';
-    document.getElementById('mobile-msg-badge').style.display = 'none';
-    document.getElementById('mobile-msg-dot').style.display = 'none';
-}
+const postSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  authorId: String,
+  caption: { type: String, default: '' },
+  image: String,
+  video: String,
+  mediaType: { type: String, enum: ['image', 'video', 'text'], default: 'text' },
+  postType: { type: String, default: 'post' },
+  likes: { type: [String], default: [] },
+  comments: { type: Array, default: [] },
+  createdAt: { type: Date, default: Date.now }
+});
+const Post = mongoose.model('Post', postSchema);
 
-// ── New Chat Search ───────────────────────────────
-window.showUserSearch = () => {
-    document.getElementById('new-chat-modal').classList.add('active');
-    document.getElementById('new-chat-search').value = '';
-    document.getElementById('new-chat-results').innerHTML = '';
-    setTimeout(() => document.getElementById('new-chat-search').focus(), 100);
+const messageSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  senderId: String,
+  receiverId: String,
+  text: String,
+  seen: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+const Message = mongoose.model('Message', messageSchema);
+
+const notificationSchema = new mongoose.Schema({
+  id: String,
+  userId: String,
+  type: String,
+  senderId: String,
+  senderUsername: String,
+  senderAvatar: String,
+  postId: String,
+  read: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+const Notification = mongoose.model('Notification', notificationSchema);
+
+function generateId() { return Math.random().toString(36).substr(2, 9) + Date.now().toString(36); }
+
+const auth = (req, res, next) => {
+  const token = (req.headers.authorization || '').split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: 'Invalid token' }); }
 };
 
-document.getElementById('close-new-chat-modal')?.addEventListener('click', () => {
-    document.getElementById('new-chat-modal').classList.remove('active');
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    if (!username || !email || !password) return res.status(400).json({ error: 'All fields required' });
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) return res.status(400).json({ error: 'Username or email already taken' });
+    const hashed = await bcryptjs.hash(password, 10);
+    const user = new User({ id: generateId(), username, email, password: hashed, avatar: username.substring(0, 2).toUpperCase() });
+    await user.save();
+    const token = jwt.sign({ id: user.id, username: user.username, avatar: user.avatar }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-document.getElementById('new-chat-search')?.addEventListener('input', async (e) => {
-    const q = e.target.value.trim();
-    const c = document.getElementById('new-chat-results');
-    if (!q) { c.innerHTML = ''; return; }
-    try {
-        const res  = await apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        c.innerHTML = '';
-        (data.users||[]).filter(u => u.id !== currentUser.id).forEach(u => {
-            const div = document.createElement('div');
-            div.style = 'display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;cursor:pointer;transition:background 0.15s;';
-            div.onmouseenter = () => div.style.background = 'var(--bg-main)';
-            div.onmouseleave = () => div.style.background = '';
-            div.innerHTML = `
-                <div class="avatar" style="width:44px;height:44px;">${avatarHtml(u.avatar,44)}</div>
-                <div><strong>${escape(u.username)}</strong><div style="font-size:0.83rem;color:var(--text-muted);">${escape(u.bio||'')}</div></div>`;
-            div.onclick = () => {
-                document.getElementById('new-chat-modal').classList.remove('active');
-                openChat(u.id, u.username, u.avatar);
-            };
-            c.appendChild(div);
-        });
-        if (!c.children.length) c.innerHTML = '<div style="color:var(--text-muted);padding:10px;">No users found</div>';
-    } catch(e) { console.error(e); }
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email }).select('+password');
+    if (!user || !(await bcryptjs.compare(password, user.password)))
+      return res.status(401).json({ error: 'Invalid email or password' });
+    const token = jwt.sign({ id: user.id, username: user.username, avatar: user.avatar }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Rooms ─────────────────────────────────────────
-window.joinRoom = (roomId, el) => {
-    currentRoomId = roomId;
-    const names = { general:'General', announcements:'Announcements', random:'Random' };
-    document.getElementById('room-active-name').innerText = names[roomId] || roomId;
-    document.getElementById('room-messages-container').innerHTML = '';
-    document.getElementById('room-active-state').style.opacity = '1';
-    document.querySelectorAll('#rooms-list .convo-item').forEach(e => e.style.background = '');
-    if (el) el.style.background = 'var(--primary-light)';
-    socket?.emit('join_room', roomId);
-};
+app.get('/api/me', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    res.json({ user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio, followers: user.followers, following: user.following } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-document.getElementById('send-room-msg-btn')?.addEventListener('click', sendRoomMessage);
-document.getElementById('room-message-input')?.addEventListener('keypress', (e) => { if(e.key==='Enter') sendRoomMessage(); });
+app.post('/api/users/avatar', auth, async (req, res) => {
+  try {
+    const { avatar } = req.body;
+    if (!avatar) return res.status(400).json({ error: 'Avatar required' });
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    user.avatar = avatar;
+    await user.save();
+    res.json({ success: true, avatar });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-function sendRoomMessage() {
-    const input = document.getElementById('room-message-input');
-    const text  = input.value.trim();
-    if (!text || !currentRoomId) return;
-    socket?.emit('room_message', { roomId: currentRoomId, text });
-    input.value = '';
-}
+app.patch('/api/users/me', auth, async (req, res) => {
+  try {
+    const { username, bio, avatar } = req.body;
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (username && username !== user.username) {
+      const taken = await User.findOne({ username });
+      if (taken) return res.status(400).json({ error: 'Username already taken' });
+      user.username = username.trim();
+    }
+    if (bio !== undefined) user.bio = bio.trim();
+    if (avatar) user.avatar = avatar;
+    await user.save();
+    res.json({ success: true, user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-function appendRoomMessage(msg) {
-    const c    = document.getElementById('room-messages-container');
-    if (!c) return;
-    const isMe = msg.senderId === currentUser.id;
-    const div  = document.createElement('div');
-    div.style  = `max-width:70%;padding:11px 16px;border-radius:20px;font-size:0.95rem;line-height:1.4;word-wrap:break-word;align-self:${isMe?'flex-end':'flex-start'};${isMe?'background:var(--primary);color:white;border-bottom-right-radius:5px;':'background:white;color:var(--text-main);border-bottom-left-radius:5px;box-shadow:0 2px 5px rgba(0,0,0,0.06);'}`;
-    div.innerHTML = `${!isMe?`<div style="font-size:0.75rem;font-weight:700;opacity:0.7;margin-bottom:3px;">${escape(msg.senderName)}</div>`:''}${escape(msg.text)}`;
-    c.appendChild(div);
-    c.scrollTop = c.scrollHeight;
-}
+app.get('/api/users/search', auth, async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json({ users: [] });
+  const users = await User.find({ username: new RegExp(q, 'i') }).limit(10);
+  res.json({ users: users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar, bio: u.bio })) });
+});
 
-// ── Socket ────────────────────────────────────────
-function initSocket() {
-    socket = io(API_URL, { transports:['polling','websocket'] });
-
-    socket.on('connect', () => socket.emit('user_join', { id: currentUser.id }));
-
-    socket.on('new_post', (post) => {
-        const c = document.getElementById('feed-container');
-        const el = createPostElement(post);
-        if (c.firstChild && !c.innerHTML.includes('No posts yet')) {
-            c.insertBefore(el, c.firstChild);
-        } else { c.innerHTML = ''; c.appendChild(el); }
+app.get('/api/users/:id', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ id: req.params.id });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const posts = await Post.find({ authorId: user.id }).sort({ createdAt: -1 });
+    res.json({
+      user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio, followers: user.followers.length, following: user.following.length, isFollowing: user.followers.includes(req.user.id) },
+      posts: posts.map(p => ({ id: p.id, caption: p.caption, image: p.image, video: p.video, mediaType: p.mediaType, likes: p.likes, createdAt: p.createdAt }))
     });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('post_deleted', ({ postId }) => document.getElementById(`post-${postId}`)?.remove());
+app.post('/api/users/:id/follow', auth, async (req, res) => {
+  if (req.params.id === req.user.id) return res.status(400).json({ error: 'Cannot follow yourself' });
+  const target = await User.findOne({ id: req.params.id });
+  const me = await User.findOne({ id: req.user.id });
+  if (!target || !me) return res.status(404).json({ error: 'User not found' });
+  const idx = target.followers.indexOf(req.user.id);
+  if (idx > -1) {
+    target.followers.splice(idx, 1);
+    const mi = me.following.indexOf(target.id);
+    if (mi > -1) me.following.splice(mi, 1);
+  } else {
+    target.followers.push(req.user.id);
+    me.following.push(target.id);
+    const notif = new Notification({ id: generateId(), userId: target.id, type: 'follow', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar });
+    await notif.save();
+    const sock = userToSocket[target.id];
+    if (sock) io.to(sock).emit('new_notification', notif);
+  }
+  await target.save(); await me.save();
+  res.json({ success: true, isFollowing: target.followers.includes(req.user.id), followers: target.followers.length });
+});
 
-    socket.on('post_liked', ({ postId, likes }) => {
-        const span = document.getElementById(`like-count-${postId}`);
-        if (span) span.innerText = likes;
+app.get('/api/posts', auth, async (req, res) => {
+  try {
+    const posts = await Post.find().sort({ createdAt: -1 }).limit(50);
+    const result = await Promise.all(posts.map(async p => {
+      const author = await User.findOne({ id: p.authorId }) || { id: p.authorId, username: 'Deleted User', avatar: '' };
+      return { id: p.id, author: { id: author.id, username: author.username, avatar: author.avatar }, caption: p.caption, image: p.image, video: p.video, mediaType: p.mediaType || 'text', postType: p.postType || 'post', likes: p.likes.length, isLiked: p.likes.includes(req.user.id), comments: p.comments.slice(-5), commentCount: p.comments.length, createdAt: p.createdAt };
+    }));
+    res.json({ posts: result });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/posts', auth, async (req, res) => {
+  try {
+    const { caption, image, video, mediaType, postType } = req.body;
+    if (!caption && !image && !video) return res.status(400).json({ error: 'Post needs content' });
+    const post = new Post({
+      id: generateId(), authorId: req.user.id, caption: caption || '',
+      image: image || null, video: video || null,
+      mediaType: mediaType || (video ? 'video' : image ? 'image' : 'text'),
+      postType: postType || 'post'
     });
+    await post.save();
+    const author = await User.findOne({ id: req.user.id });
+    const data = { id: post.id, author: { id: author.id, username: author.username, avatar: author.avatar }, caption: post.caption, image: post.image, video: post.video, mediaType: post.mediaType, postType: post.postType, likes: 0, isLiked: false, comments: [], commentCount: 0, createdAt: post.createdAt };
+    io.emit('new_post', data);
+    res.json({ success: true, post: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('new_comment', ({ postId, comment, commentCount }) => {
-        const cc = document.getElementById(`comment-count-${postId}`);
-        if (cc) cc.innerText = commentCount;
-        const box = document.getElementById(`comments-${postId}`);
-        if (box) {
-            const d = document.createElement('div');
-            d.className = 'comment';
-            d.innerHTML = `<div class="avatar" style="width:30px;height:30px;flex-shrink:0;">${avatarHtml('',30)}</div><div><strong>${escape(comment.username)}</strong> ${escape(comment.text)}</div>`;
-            box.appendChild(d);
-            box.scrollTop = box.scrollHeight;
-        }
-    });
+app.delete('/api/posts/:id', auth, async (req, res) => {
+  try {
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    if (post.authorId !== req.user.id) return res.status(403).json({ error: 'Not your post' });
+    await Post.deleteOne({ id: req.params.id });
+    io.emit('post_deleted', { postId: post.id });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('new_direct_message', (msg) => {
-        if (msg.senderId === currentChatUserId || msg.senderId === currentUser.id) {
-            appendMessage(msg);
-            scrollToBottom();
-            if (msg.senderId !== currentUser.id) socket.emit('message_seen', { messageId: msg.id });
-        } else if (msg.senderId !== currentUser.id) {
-            unreadMessages++;
-            document.getElementById('msg-badge').style.display = 'block';
-            document.getElementById('msg-badge').innerText = unreadMessages;
-            document.getElementById('mobile-msg-badge').style.display = 'block';
-            document.getElementById('mobile-msg-dot').style.display = 'block';
-            showToast(`New message from ${allUsersCache[msg.senderId]?.username||'someone'}`);
-            loadConversations();
-        }
-    });
+app.post('/api/posts/:id/like', auth, async (req, res) => {
+  try {
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    const idx = post.likes.indexOf(req.user.id);
+    let liked;
+    if (idx > -1) { post.likes.splice(idx, 1); liked = false; }
+    else {
+      post.likes.push(req.user.id); liked = true;
+      if (post.authorId !== req.user.id) {
+        const notif = new Notification({ id: generateId(), userId: post.authorId, type: 'like', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar, postId: post.id });
+        await notif.save();
+        const sock = userToSocket[post.authorId];
+        if (sock) io.to(sock).emit('new_notification', notif);
+      }
+    }
+    await post.save();
+    io.emit('post_liked', { postId: post.id, likes: post.likes.length, liked });
+    res.json({ success: true, liked, likes: post.likes.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('message_seen', ({ messageId }) => {
-        const icon = document.getElementById(`seen-${messageId}`);
-        if (icon) { icon.className = 'ri-check-double-line'; icon.style.color = '#60a5fa'; }
-    });
+app.post('/api/posts/:id/comment', auth, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'Text required' });
+    const post = await Post.findOne({ id: req.params.id });
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    const comment = { id: generateId(), username: req.user.username, text, createdAt: new Date().toISOString() };
+    post.comments.push(comment);
+    await post.save();
+    if (post.authorId !== req.user.id) {
+      const notif = new Notification({ id: generateId(), userId: post.authorId, type: 'comment', senderId: req.user.id, senderUsername: req.user.username, senderAvatar: req.user.avatar, postId: post.id });
+      await notif.save();
+      const sock = userToSocket[post.authorId];
+      if (sock) io.to(sock).emit('new_notification', notif);
+    }
+    io.emit('new_comment', { postId: post.id, comment, commentCount: post.comments.length });
+    res.json({ success: true, comment });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('user_typing', ({ senderId }) => {
-        if (senderId === currentChatUserId) {
-            document.getElementById('typing-indicator').style.display = 'block';
-        }
-    });
-    socket.on('user_stop_typing', ({ senderId }) => {
-        if (senderId === currentChatUserId) {
-            document.getElementById('typing-indicator').style.display = 'none';
-        }
-    });
+app.get('/api/notifications', auth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 }).limit(20);
+    res.json({ notifications });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('room_history', (msgs) => {
-        const c = document.getElementById('room-messages-container');
-        if (!c) return;
-        c.innerHTML = '';
-        msgs.forEach(m => appendRoomMessage(m));
-        c.scrollTop = c.scrollHeight;
-    });
+app.post('/api/notifications/read', auth, async (req, res) => {
+  try {
+    await Notification.updateMany({ userId: req.user.id }, { read: true });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    socket.on('new_room_message', ({ roomId, msg }) => {
-        if (roomId === currentRoomId) appendRoomMessage(msg);
-    });
+app.get('/api/messages/:userId', auth, async (req, res) => {
+  const msgs = await Message.find({ $or: [{ senderId: req.user.id, receiverId: req.params.userId }, { senderId: req.params.userId, receiverId: req.user.id }] }).sort({ createdAt: 1 });
+  await Message.updateMany({ senderId: req.params.userId, receiverId: req.user.id, seen: false }, { seen: true });
+  res.json({ messages: msgs });
+});
 
-    socket.on('new_notification', (notif) => {
-        unreadNotifs++;
-        updateNotifBadge();
-        showToast(`${notif.senderUsername} ${notif.type==='like'?'liked your post':notif.type==='comment'?'commented':notif.type==='follow'?'followed you':'sent a message'}`);
-    });
-}
+app.get('/api/conversations', auth, async (req, res) => {
+  const messages = await Message.find({ $or: [{ senderId: req.user.id }, { receiverId: req.user.id }] }).sort({ createdAt: -1 });
+  const userIds = new Set();
+  messages.forEach(m => {
+    if (m.senderId !== req.user.id) userIds.add(m.senderId);
+    if (m.receiverId !== req.user.id) userIds.add(m.receiverId);
+  });
+  const users = await User.find({ id: { $in: Array.from(userIds) } });
+  const result = await Promise.all(users.map(async u => {
+    const lastMsg = messages.find(m => m.senderId === u.id || m.receiverId === u.id);
+    const unread = await Message.countDocuments({ senderId: u.id, receiverId: req.user.id, seen: false });
+    return { id: u.id, username: u.username, avatar: u.avatar, lastMessage: lastMsg ? lastMsg.text : '', unread };
+  }));
+  res.json({ users: result });
+});
 
-// ── Boot ──────────────────────────────────────────
-initApp();
+const socketToUser = {};
+const userToSocket = {};
+
+io.on('connection', (socket) => {
+  socket.on('user_join', ({ id }) => {
+    socketToUser[socket.id] = id;
+    userToSocket[id] = socket.id;
+    io.emit('online_count', Object.keys(userToSocket).length);
+  });
+
+  socket.on('typing', ({ receiverId }) => {
+    const sock = userToSocket[receiverId];
+    if (sock) io.to(sock).emit('user_typing', { senderId: socketToUser[socket.id] });
+  });
+
+  socket.on('stop_typing', ({ receiverId }) => {
+    const sock = userToSocket[receiverId];
+    if (sock) io.to(sock).emit('user_stop_typing', { senderId: socketToUser[socket.id] });
+  });
+
+  socket.on('direct_message', async ({ receiverId, text }) => {
+    const senderId = socketToUser[socket.id];
+    if (!senderId || !receiverId || !text) return;
+    const msg = new Message({ id: generateId(), senderId, receiverId, text });
+    await msg.save();
+    const msgData = { id: msg.id, senderId, receiverId, text, seen: false, createdAt: msg.createdAt };
+    socket.emit('new_direct_message', msgData);
+    const receiverSocketId = userToSocket[receiverId];
+    if (receiverSocketId) io.to(receiverSocketId).emit('new_direct_message', msgData);
+    const sender = await User.findOne({ id: senderId });
+    if (sender) {
+      const notif = new Notification({ id: generateId(), userId: receiverId, type: 'message', senderId, senderUsername: sender.username, senderAvatar: sender.avatar });
+      await notif.save();
+      if (receiverSocketId) io.to(receiverSocketId).emit('new_notification', notif);
+    }
+  });
+
+  socket.on('message_seen', async ({ messageId }) => {
+    await Message.findOneAndUpdate({ id: messageId }, { seen: true });
+    const msg = await Message.findOne({ id: messageId });
+    if (msg) {
+      const senderSocket = userToSocket[msg.senderId];
+      if (senderSocket) io.to(senderSocket).emit('message_seen', { messageId });
+    }
+  });
+
+  const roomMessages = { general: [], announcements: [], random: [] };
+
+  socket.on('join_room', (roomId) => {
+    Object.keys(roomMessages).forEach(r => socket.leave(r));
+    socket.join(roomId);
+    socket.emit('room_history', roomMessages[roomId] || []);
+  });
+
+  socket.on('room_message', async ({ roomId, text }) => {
+    const senderId = socketToUser[socket.id];
+    if (!senderId || !roomId || !text) return;
+    const sender = await User.findOne({ id: senderId });
+    if (!sender) return;
+    const msg = { id: generateId(), senderId, senderName: sender.username, senderAvatar: sender.avatar, text, createdAt: new Date().toISOString() };
+    if (!roomMessages[roomId]) roomMessages[roomId] = [];
+    roomMessages[roomId].push(msg);
+    if (roomMessages[roomId].length > 100) roomMessages[roomId].shift();
+    io.to(roomId).emit('new_room_message', { roomId, msg });
+  });
+
+  socket.on('disconnect', () => {
+    const userId = socketToUser[socket.id];
+    if (userId) delete userToSocket[userId];
+    delete socketToUser[socket.id];
+    io.emit('online_count', Object.keys(userToSocket).length);
+  });
+});
+
+app.use((req, res) => { res.sendFile(path.join(publicPath, 'index.html')); });
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Snappic running on port ${PORT}`));
