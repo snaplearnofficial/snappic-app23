@@ -1,0 +1,58 @@
+// ============================================================
+// EXPLANATION OF THE MONGO_URI WARNING CODE
+// File: server.js (Lines 42-45)
+// ============================================================
+
+// Line 1: console.log('\n⚠️  WARNING: MONGO_URI is not set or using placeholder.');
+// ─────────────────────────────────────────────────────────────
+// This prints a warning message to the terminal.
+// - '\n' adds a new line before the message (for better formatting)
+// - '⚠️' is an emoji warning symbol
+// - The message tells the user that MONGO_URI is either empty or contains a placeholder value
+
+// Line 2: console.log('Please update the .env file with your MongoDB Atlas connection string.\n');
+// ─────────────────────────────────────────────────────────────
+// This tells the user exactly what to do:
+// - "Please update the .env file" - tells them which file to edit
+// - "with your MongoDB Atlas connection string" - tells them what to put in it
+// - '\n' adds a newline at the end
+
+// Line 3: }
+// ─────────────────────────────────────────────────────────────
+// This closes the if statement that started on line 41:
+// if (!MONGO_URI || MONGO_URI.includes('your_mongodb'))
+
+// ============================================================
+// THE COMPLETE IF STATEMENT (Lines 40-45):
+// ============================================================
+
+// const MONGO_URI = process.env.MONGO_URI;
+
+// if (!MONGO_URI || MONGO_URI.includes('your_mongodb')) {
+//   console.log('\n⚠️  WARNING: MONGO_URI is not set or using placeholder.');
+//   console.log('Please update the .env file with your MongoDB Atlas connection string.\n');
+// }
+
+// WHAT IT DOES:
+// 1. Gets MONGO_URI from environment variables (.env file)
+// 2. Checks if it's empty OR contains "your_mongodb" (placeholder text)
+// 3. If either condition is true, shows the warning
+
+// ============================================================
+// YOUR .ENV FILE SHOULD LOOK LIKE THIS:
+// ============================================================
+
+// MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
+// JWT_SECRET=your_secret_key_here
+// PORT=3000
+
+// ============================================================
+// HOW TO FIX THE WARNING:
+// ============================================================
+
+// 1. Make sure your .env file exists in the project root
+// 2. Make sure MONGO_URI is set with a valid MongoDB Atlas connection string
+// 3. Restart the server after updating .env (Ctrl+C, then node server.js)
+
+// Your current .env already has the correct MONGO_URI set!
+// Just restart the server and the warning will disappear.
