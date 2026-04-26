@@ -762,7 +762,7 @@ io.on('connection', (socket) => {
     Object.keys(roomMessages).forEach(r => socket.leave(r));
     socket.join(roomId);
     socket.emit('room_history', roomMessages[roomId] || []);
-  });
+  }); 
 
   socket.on('room_message', async ({ roomId, text }) => {
     const senderId = socketToUser[socket.id];
